@@ -4,7 +4,6 @@ import pandas as pd
 from datetime import datetime
 import re
 
-# cities to scrape
 cities = [
     "Pristina+Kosovo",
     "Prizren+Kosovo",
@@ -81,7 +80,6 @@ def scrape_10day(city):
         })
 
 
-# scrape all cities
 for city in cities:
 
     print("Scraping:", city)
@@ -93,12 +91,9 @@ for city in cities:
         print("Error scraping", city)
 
 
-# create dataframes
 hourly_df = pd.DataFrame(hourly_data)
 tenday_df = pd.DataFrame(tenday_data)
 
-
-# save datasets
 hourly_df.to_csv("kosovo_hourly_weather.csv", index=False)
 tenday_df.to_csv("kosovo_10day_weather.csv", index=False)
 
