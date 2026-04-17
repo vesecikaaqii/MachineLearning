@@ -78,6 +78,7 @@ for city, (lat, lon) in cities.items():
                 })
 
         current_res = requests.get(CURRENT_URL, params=params).json()
+
         if current_res.get("cod") != 200:
             print("Current error:", city, current_res.get("message"))
         else:
@@ -114,6 +115,7 @@ df["day"] = df["datetime"].dt.day
 df["month"] = df["datetime"].dt.month
 
 file_name = "kosovo_weather_dataset.csv"
+
 if not os.path.exists(file_name):
     df.to_csv(file_name, index=False)
 else:
