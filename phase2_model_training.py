@@ -1,34 +1,31 @@
 """
-Phase II - Analysis and Evaluation (Re-training)
+Phase II - Model Training
 
-Model: Random Forest Regressor (ensemble of decision trees).
+This phase implements ONLY the training of a single supervised-learning
+algorithm on the Kosovo weather dataset.  Analysis, evaluation, and
+re-training (iterative improvement) are scheduled for Phase III.
 
-Why Random Forest?
-------------------
-  * Supervised regression fits the main project task: predict temperature
-    from a set of meteorological features.
-  * Random Forest is:
-      - non-linear            (captures interactions that linear models miss)
-      - robust to outliers    (trees split on thresholds, not distances)
-      - scale-free            (no feature scaling needed)
-      - interpretable         (built-in feature importances)
-  * Two re-training iterations are performed to satisfy the phase title
-    "Re-training": a baseline configuration followed by a tuned one, with
-    explicit justification for every hyperparameter change.
+Algorithm
+---------
+Random Forest Regressor - an ensemble of decision trees chosen because:
+  * the task is a *supervised regression* (target = temperature, numeric);
+  * relationships among humidity / pressure / clouds / temperature are
+    non-linear, a setting where tree ensembles excel;
+  * it is robust to outliers and scale-free (no feature scaling required);
+  * it exposes interpretable feature importances.
 
 Task
 ----
     Input  : meteorological features (humidity, pressure, wind, clouds,
              visibility, precipitation probability, cyclic hour/month)
-    Output : air temperature in degrees Celsius (regression target)
+    Output : air temperature in degrees Celsius
 
 Artifacts (./models/ and ./reports/)
 ------------------------------------
-    models/rf_baseline.pkl         - baseline Random Forest
-    models/rf_retrained.pkl        - tuned (re-trained) Random Forest
-    models/scaler_phase2.pkl       - fitted StandardScaler (numeric)
-    reports/phase2_metrics.txt     - full training log
-    reports/phase2_summary.json    - machine-readable metrics
+    models/rf_model.pkl            - trained Random Forest
+    models/scaler_phase2.pkl       - fitted StandardScaler
+    reports/phase2_training_log.txt       - full training log
+    reports/phase2_training_summary.json  - machine-readable summary
     reports/phase2_correlation_heatmap.png
     reports/phase2_feature_importance.png
     reports/phase2_pred_vs_true.png
@@ -45,7 +42,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import joblib
 
-from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
@@ -72,7 +69,7 @@ def log(msg=""):
 # 1. LOAD & PREPROCESS
 # ---------------------------------------------------------------------------
 log("=" * 70)
-log("PHASE II  -  Random Forest Regressor (single-algorithm pipeline)")
+log("PHASE II  -  Model Training  (Random Forest Regressor)")
 log("=" * 70)
 
 df = pd.read_csv(DATA_PATH)
@@ -117,7 +114,7 @@ log(corr["temperature"].drop("temperature").abs().sort_values(ascending=False).t
 
 
 # ---------------------------------------------------------------------------
-# 3. TRAIN / TEST SPLIT  +  optional scaling (for logging parity)
+# 3. TRAIN / TEST SPLIT
 # ---------------------------------------------------------------------------
 X = df[FEATURES].values
 y = df[TARGET].values
@@ -126,8 +123,8 @@ X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.20, random_state=42
 )
 
-# RandomForest doesn't need scaling, but we save a scaler so downstream
-# consumers (dashboards, deployment) have a consistent pipeline.
+# Scaler is fitted on train only, saved for pipeline compatibility.
+# Random Forest itself does not need scaling.
 scaler = StandardScaler().fit(X_train)
 joblib.dump(scaler, os.path.join(MODELS_DIR, "scaler_phase2.pkl"))
 
@@ -135,80 +132,55 @@ log(f"\nTrain / Test split  : {len(X_train)} / {len(X_test)}  (80% / 20%)")
 
 
 # ---------------------------------------------------------------------------
-# 4. HELPER
+# 4. TRAIN THE MODEL   (single training run - no re-training here)
 # ---------------------------------------------------------------------------
-def train_eval(cfg, tag):
-    model = RandomForestRegressor(random_state=42, n_jobs=-1, **cfg)
-    model.fit(X_train, y_train)
-
-    y_pred_train = model.predict(X_train)
-    y_pred_test  = model.predict(X_test)
-
-    mae  = mean_absolute_error(y_test, y_pred_test)
-    rmse = np.sqrt(mean_squared_error(y_test, y_pred_test))
-    r2   = r2_score(y_test, y_pred_test)
-    r2_tr = r2_score(y_train, y_pred_train)
-    cv_r2 = cross_val_score(model, X, y, cv=5, scoring="r2").mean()
-
-    log(f"\n[{tag}] cfg={cfg}")
-    log(f"  MAE          : {mae:.3f} C")
-    log(f"  RMSE         : {rmse:.3f} C")
-    log(f"  R^2 (train)  : {r2_tr:.4f}")
-    log(f"  R^2 (test)   : {r2:.4f}")
-    log(f"  R^2 (5-fold) : {cv_r2:.4f}")
-
-    return {
-        "model": model, "y_pred": y_pred_test,
-        "metrics": {"MAE": mae, "RMSE": rmse,
-                    "R2_train": r2_tr, "R2_test": r2, "R2_cv": cv_r2},
-        "cfg": cfg,
-    }
-
-
-# ---------------------------------------------------------------------------
-# 5. RE-TRAINING  ->  two explicit iterations
-# ---------------------------------------------------------------------------
-log("\n" + "-" * 70)
-log("ITERATION 1  -  baseline Random Forest (default-ish, 100 trees)")
-log("-" * 70)
-baseline = train_eval(
-    dict(n_estimators=100, max_depth=None, min_samples_leaf=1),
-    tag="baseline",
-)
+cfg = dict(n_estimators=100, max_depth=None, min_samples_leaf=1,
+           random_state=42, n_jobs=-1)
 
 log("\n" + "-" * 70)
-log("ITERATION 2  -  re-trained RF (300 trees, leaf>=2, max_features='sqrt')")
+log("TRAINING")
 log("-" * 70)
-retrained = train_eval(
-    dict(n_estimators=300, max_depth=None, min_samples_leaf=2,
-         max_features="sqrt"),
-    tag="retrained",
-)
+log(f"Config : {cfg}")
+
+model = RandomForestRegressor(**cfg)
+model.fit(X_train, y_train)
+
+y_pred_train = model.predict(X_train)
+y_pred_test  = model.predict(X_test)
+
+mae   = mean_absolute_error(y_test,  y_pred_test)
+rmse  = np.sqrt(mean_squared_error(y_test, y_pred_test))
+r2_te = r2_score(y_test,  y_pred_test)
+r2_tr = r2_score(y_train, y_pred_train)
+
+log("\nTraining results:")
+log(f"  MAE         : {mae:.3f} C")
+log(f"  RMSE        : {rmse:.3f} C")
+log(f"  R^2 (train) : {r2_tr:.4f}")
+log(f"  R^2 (test)  : {r2_te:.4f}")
 
 
 # ---------------------------------------------------------------------------
-# 6. SAVE MODELS + PLOTS
+# 5. SAVE MODEL + VISUALISATIONS
 # ---------------------------------------------------------------------------
-joblib.dump(baseline["model"],  os.path.join(MODELS_DIR, "rf_baseline.pkl"))
-joblib.dump(retrained["model"], os.path.join(MODELS_DIR, "rf_retrained.pkl"))
+joblib.dump(model, os.path.join(MODELS_DIR, "rf_model.pkl"))
 
-# -- feature importance (re-trained) ----------------------------------------
-imp = pd.Series(retrained["model"].feature_importances_, index=FEATURES)\
-        .sort_values()
+# -- feature importance -----------------------------------------------------
+imp = pd.Series(model.feature_importances_, index=FEATURES).sort_values()
 plt.figure(figsize=(7, 5))
 imp.plot(kind="barh", color="steelblue")
-plt.title("Phase II - Random Forest feature importance (re-trained)")
+plt.title("Phase II - Random Forest feature importance")
 plt.tight_layout()
 plt.savefig(os.path.join(REPORTS_DIR, "phase2_feature_importance.png"), dpi=150)
 plt.close()
 
-log("\nFeature importance (re-trained):")
+log("\nFeature importance:")
 log(imp.sort_values(ascending=False).to_string())
 
-# -- predicted vs true ------------------------------------------------------
+# -- predicted vs actual ----------------------------------------------------
 plt.figure(figsize=(6, 6))
-plt.scatter(y_test, baseline["y_pred"],  alpha=0.45, s=16, label="baseline")
-plt.scatter(y_test, retrained["y_pred"], alpha=0.45, s=16, label="re-trained")
+plt.scatter(y_test, y_pred_test, alpha=0.55, s=18, color="steelblue",
+            label="predictions")
 lo, hi = y_test.min(), y_test.max()
 plt.plot([lo, hi], [lo, hi], "k--", lw=1, label="ideal")
 plt.xlabel("Actual temperature (C)")
@@ -220,21 +192,25 @@ plt.savefig(os.path.join(REPORTS_DIR, "phase2_pred_vs_true.png"), dpi=150)
 plt.close()
 
 summary = {
+    "phase": "II - Model Training",
     "algorithm": "RandomForestRegressor",
     "rows_used": int(len(df)),
     "train_size": int(len(X_train)),
     "test_size":  int(len(X_test)),
     "features":   FEATURES,
-    "baseline":   {"config": baseline["cfg"],  "metrics": baseline["metrics"]},
-    "retrained":  {"config": retrained["cfg"], "metrics": retrained["metrics"]},
+    "target":     TARGET,
+    "config":     cfg,
+    "metrics":    {"MAE": mae, "RMSE": rmse,
+                   "R2_train": r2_tr, "R2_test": r2_te},
     "feature_importance": imp.sort_values(ascending=False).to_dict(),
 }
-with open(os.path.join(REPORTS_DIR, "phase2_summary.json"), "w") as f:
+with open(os.path.join(REPORTS_DIR, "phase2_training_summary.json"), "w") as f:
     json.dump(summary, f, indent=2)
 
-with open(os.path.join(REPORTS_DIR, "phase2_metrics.txt"), "w", encoding="utf-8") as f:
+with open(os.path.join(REPORTS_DIR, "phase2_training_log.txt"), "w", encoding="utf-8") as f:
     f.write("\n".join(log_lines))
 
 log("\n" + "=" * 70)
 log("Phase II complete.  Models -> ./models/   Reports -> ./reports/")
+log("Next step (Phase III): analysis, evaluation, and re-training.")
 log("=" * 70)

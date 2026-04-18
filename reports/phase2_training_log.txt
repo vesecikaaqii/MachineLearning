@@ -1,0 +1,40 @@
+======================================================================
+PHASE II  -  Model Training  (Random Forest Regressor)
+======================================================================
+Rows after cleaning : 1107
+Features (11)       : ['humidity', 'pressure', 'wind_speed', 'wind_deg', 'clouds', 'visibility', 'pop', 'hour_sin', 'hour_cos', 'month_sin', 'month_cos']
+Target              : temperature (deg C)
+
+Strongest absolute correlations with temperature:
+humidity      0.758142
+pressure      0.406305
+wind_speed    0.370947
+clouds        0.199170
+visibility    0.172997
+pop           0.146912
+
+Train / Test split  : 885 / 222  (80% / 20%)
+
+----------------------------------------------------------------------
+TRAINING
+----------------------------------------------------------------------
+Config : {'n_estimators': 100, 'max_depth': None, 'min_samples_leaf': 1, 'random_state': 42, 'n_jobs': -1}
+
+Training results:
+  MAE         : 1.029 C
+  RMSE        : 1.519 C
+  R^2 (train) : 0.9828
+  R^2 (test)  : 0.8831
+
+Feature importance:
+humidity      0.669695
+pressure      0.127004
+clouds        0.059431
+wind_speed    0.043379
+hour_sin      0.042974
+wind_deg      0.032128
+hour_cos      0.014547
+pop           0.009402
+visibility    0.001439
+month_sin     0.000000
+month_cos     0.000000

@@ -33,10 +33,19 @@ A Machine Learning project that builds a complete, reproducible pipeline — fro
 2. [Technologies Used](#-2-technologies-used)
 3. [Installation and Setup](#-3-installation-and-setup)
 4. [Dataset Description](#-4-dataset-description)
-5. [PHASE I — Data Preparation](#-phase-i--data-preparation)
+5. [PHASE I — Model Preparation](#-phase-i--model-preparation)
 6. [Dataset Overview and Exploratory Insights](#-dataset-overview-and-exploratory-insights)
 7. [Selected Algorithm](#-selected-algorithm)
-8. [PHASE II — Analysis and Evaluation (Re-training)](#-phase-ii--analysis-and-evaluation-re-training)
+8. [PHASE II — Model Training](#-phase-ii--model-training)
+9. [PHASE III — Analysis and Evaluation (planned)](#-phase-iii--analysis-and-evaluation-planned)
+
+### Project Phases (per course structure)
+
+| Phase | Title | Status |
+|-------|-------|--------|
+| I  | **Model Preparation** — data collection, cleaning, EDA, task definition | ✅ Completed |
+| II | **Model Training** — train a single supervised algorithm | ✅ Completed |
+| III | **Analysis and Evaluation** — evaluate, re-train, improve | 🔜 Planned |
 
 ---
 
@@ -140,10 +149,10 @@ reports/
 
 ---
 
-# 🧩 PHASE I — Data Preparation
+# 🧩 PHASE I — Model Preparation
 
 ## 🎯 Objective of the Phase
-Phase I lays the foundation of the whole project: **collecting, structuring, and performing the initial cleaning of a real meteorological dataset for Kosovo.** No ML model can produce reliable results without high-quality, well-structured data, and this phase is therefore considered the cornerstone of the project.
+Phase I lays the foundation of the whole project: **collecting, structuring, and performing the initial preparation of a real meteorological dataset for Kosovo**, and defining the ML task the model will later solve. Preparing the model means preparing *everything the model will need* — clean data, well-understood features, a clearly stated target, and a justified algorithm family — before any training takes place.
 
 ## 🛠️ Tasks Performed
 
@@ -220,11 +229,12 @@ Out of 20 total columns, the structural split is:
 
 ## ✅ Phase I Outcome
 
-A complete, clean, and well-structured dataset for Kosovo:
+A complete, clean, and well-structured foundation for Kosovo weather modelling:
 - **1107 instances × 20 attributes**, only **0.12 % NaN** (easily handled),
 - **3 ML tasks clearly defined** (regression, classification, time-series),
 - descriptive statistics and class distribution fully documented,
-- ready to feed the Phase II and Phase III models without requiring further major cleaning.
+- a supervised regression algorithm selected and justified,
+- ready to be trained in Phase II without requiring further major cleaning.
 
 ---
 
@@ -323,24 +333,24 @@ In accordance with the professor's brief (*"Students must implement **any one** 
 
 | Phase | Random Forest Configuration | Status |
 |-------|----------------------------|--------|
-| Phase II | Baseline (100 trees) + Re-trained (300 trees, leaf ≥ 2, `max_features='sqrt'`) | ✅ Completed |
-| Phase III | Optimised RF (automated hyperparameter tuning with GridSearchCV + feature engineering) | 🔜 Planned |
+| Phase II | Baseline training (100 trees, default leaf, random_state = 42) | ✅ Completed |
+| Phase III | Re-training + evaluation (hyperparameter tuning with GridSearchCV, anti-overfitting, feature engineering) | 🔜 Planned |
 
 ---
 
-# 🧪 PHASE II — Analysis and Evaluation (Re-training)
+# 🧪 PHASE II — Model Training
 
 ## 🎯 Objective of the Phase
 
-Phase II applies a **single algorithm — Random Forest Regressor** — to the task of predicting air temperature (°C) from meteorological features, and explicitly demonstrates the iterative process of **re-training**: a *baseline* configuration followed by a *re-trained* configuration with tuned, anti-overfitting hyperparameters. This directly addresses the phase title "Re-training".
+Phase II is strictly the **training** step of the ML workflow: a single supervised algorithm (**Random Forest Regressor**) is trained on the prepared dataset from Phase I. Evaluation in depth, re-training, and hyperparameter iteration are **deferred to Phase III** — this phase focuses on producing a correctly trained model together with the preprocessing pipeline around it.
 
 - **Training script:** [`phase2_model_training.py`](phase2_model_training.py)
-- **Full metrics log:** [`reports/phase2_metrics.txt`](reports/phase2_metrics.txt)
-- **Machine-readable summary:** [`reports/phase2_summary.json`](reports/phase2_summary.json)
+- **Training log:** [`reports/phase2_training_log.txt`](reports/phase2_training_log.txt)
+- **Machine-readable summary:** [`reports/phase2_training_summary.json`](reports/phase2_training_summary.json)
 
 ## 📸 Phase II Visualisations
 
-Three key visualisations summarise the outputs of this phase:
+Three visualisations are produced during training:
 
 <table>
   <tr>
@@ -355,8 +365,8 @@ Three key visualisations summarise the outputs of this phase:
   </tr>
   <tr>
     <td align="center"><sub>Correlations across meteorological features</sub></td>
-    <td align="center"><sub>Baseline vs. Re-trained against the ideal diagonal</sub></td>
-    <td align="center"><sub>Humidity, hour_sin, and pressure dominate</sub></td>
+    <td align="center"><sub>Model predictions against the ideal diagonal</sub></td>
+    <td align="center"><sub>Humidity, pressure, and clouds dominate</sub></td>
   </tr>
 </table>
 
@@ -369,7 +379,6 @@ Three key visualisations summarise the outputs of this phase:
 | **Outlier robustness** | Trees split on thresholds, not distances, so extreme values do not distort the model as they would a linear regressor. |
 | **No feature scaling required** | Trees are scale-invariant — this simplifies the pipeline and reduces the risk of pre-processing mistakes. |
 | **Interpretability** | Provides built-in **feature importances**, helping verify that the model learned physically meaningful relationships, not artefacts. |
-| **Natural fit for "Re-training"** | Exposes clear hyperparameters (`n_estimators`, `min_samples_leaf`, `max_features`) that allow explicit, documentable iteration. |
 
 ## 🧹 Data Preprocessing
 
@@ -378,7 +387,7 @@ Three key visualisations summarise the outputs of this phase:
 3. **Cyclic encoding of time** using `sin / cos` for `hour` and `month`:
    - Reason: `23:00` and `00:00` are adjacent in time but appear numerically far apart. `sin / cos` preserves the cyclic adjacency.
 4. **80 / 20 train / test split** with `random_state = 42` for reproducibility.
-5. **`StandardScaler`** is fitted and saved purely for future pipeline compatibility; Random Forest itself does not require scaling.
+5. **`StandardScaler`** is fitted on the training set and saved for future pipeline compatibility; Random Forest itself does not require scaling.
 
 ### 📊 Split sizes
 
@@ -394,9 +403,7 @@ Three key visualisations summarise the outputs of this phase:
 
 **Target:** `temperature` (°C, numeric).
 
-## 🔎 Exploratory Data Analysis (EDA)
-
-### Correlation Heat-map
+## 🔎 Correlation heat-map (produced during training)
 
 ![Correlation Heatmap](reports/phase2_correlation_heatmap.png)
 
@@ -411,28 +418,26 @@ Three key visualisations summarise the outputs of this phase:
 
 ➡️ Humidity is the strongest predictor — a physically expected result, since warmer air typically holds less relative humidity.
 
-## 🔄 Re-training — two explicit iterations
+## ⚙️ Training Configuration
 
-| Parameter | Iteration 1 (baseline) | Iteration 2 (re-trained) |
-|-----------|------------------------|--------------------------|
-| `n_estimators` | 100 | **300** |
-| `min_samples_leaf` | 1 | **2** |
-| `max_features` | `None` (all) | **`sqrt`** |
-| `max_depth` | `None` (unlimited) | `None` |
-| `random_state` | 42 | 42 |
+| Hyperparameter | Value |
+|----------------|-------|
+| `n_estimators` | 100 |
+| `max_depth` | `None` (unrestricted) |
+| `min_samples_leaf` | 1 |
+| `random_state` | 42 |
+| `n_jobs` | -1 (all cores) |
 
-### 💡 Justification of the changes
-- **300 trees instead of 100** → reduces variance by averaging more trees (stronger bagging).
-- **`min_samples_leaf = 2`** → prevents the creation of leaves containing a single sample, a classic sign of overfitting.
-- **`max_features = 'sqrt'`** → each tree sees only ~√11 ≈ 3 features per split → increases *decorrelation* among trees → a better-generalising ensemble.
-- The primary goal is **reducing overfitting**, not maximising test-set R² on a single split.
+The baseline configuration is a deliberately *simple* Random Forest — reasonable defaults, no tuning. Tuning is reserved for Phase III where it belongs.
 
-## 📊 Results
+## 📊 Training Results
 
-| Model | MAE ↓ | RMSE ↓ | R² (train) | R² (test) | R² (5-fold CV) |
-|-------|-------|--------|------------|-----------|----------------|
-| **Baseline RF**   | **1.029 °C** | **1.519 °C** | 0.9828 | 0.8831 | 0.8677 |
-| **Re-trained RF** | 1.132 °C | 1.546 °C | **0.9561** | 0.8789 | **0.8742** |
+| Metric | Value |
+|--------|-------|
+| MAE (test)  | **1.029 °C** |
+| RMSE (test) | **1.519 °C** |
+| R² (train)  | 0.9828 |
+| R² (test)   | **0.8831** |
 
 ### 📈 Predicted vs. Actual
 
@@ -440,45 +445,41 @@ Three key visualisations summarise the outputs of this phase:
 
 The points cluster tightly along the ideal diagonal (dashed line) — the model matches the actual temperature closely. Larger deviations appear only at the extremes (very hot / very cold), which are under-represented in the dataset.
 
-### 🔥 Feature Importance (re-trained model)
+### 🔥 Feature Importance
 
 ![Feature Importance](reports/phase2_feature_importance.png)
 
 | Feature | Importance |
 |---------|-----------|
-| `humidity`   | **0.342** |
-| `hour_sin`   | 0.153 |
-| `pressure`   | 0.132 |
-| `wind_speed` | 0.119 |
-| `clouds`     | 0.095 |
-| `hour_cos`   | 0.083 |
-| `wind_deg`   | 0.053 |
-| `pop`        | 0.018 |
-| `visibility` | 0.005 |
+| `humidity`   | **0.670** |
+| `pressure`   | 0.127 |
+| `clouds`     | 0.059 |
+| `wind_speed` | 0.043 |
+| `hour_sin`   | 0.043 |
+| `wind_deg`   | 0.032 |
+| `hour_cos`   | 0.015 |
+| `pop`        | 0.009 |
+| `visibility` | 0.001 |
 | `month_sin`  | ~0.000 |
 | `month_cos`  | ~0.000 |
 
-➡️ Humidity, hour of day (sin/cos), and pressure are the three most informative features. `month_*` are effectively zero because the dataset spans only ~5 days, leaving no month-level variance.
-
-## 💬 Discussion of Results
-
-1. **R² (test) ≈ 0.88** — the model explains ~88 % of the temperature variance with **MAE ≈ 1 °C** — a strong outcome for a small dataset (1107 rows, 5 days).
-
-2. **Baseline vs. Re-trained — an important lesson:**
-   - The baseline shows **R² (train) = 0.9828** vs. **R² (test) = 0.8831** → a ~10-point gap → clear **overfitting**.
-   - The re-trained model shows **R² (train) = 0.9561** vs. **R² (test) = 0.8789** → a ~7.7-point gap → overfitting noticeably reduced.
-   - **5-fold CV R² rose** from 0.8677 → **0.8742** → the re-trained model **generalises better**.
-   - This is the classic case where a single fixed test split can mislead: the test set sometimes hides overfitting that CV reveals, which is why both were reported.
-
-3. **Feature importance confirms the physics** — humidity dominates, followed by hour of day and pressure, so the model learned meaningful relationships rather than artefacts.
-
-4. **Main limitation** — the dataset spans only 5 days, with no monthly/seasonal variation, which is why `month_sin/cos` have zero importance. Phase III will address this through a longer data-collection window and more advanced tuning.
+➡️ Humidity dominates the temperature prediction, followed by pressure and clouds — results consistent with atmospheric physics. `month_*` are effectively zero because the dataset spans only ~5 days.
 
 ## 🧾 Phase II Conclusions
 
-1. **A single algorithm — Random Forest Regressor — was implemented**, as required by the professor ("any one of the algorithms").
-2. **The re-training process** was demonstrated through two explicit iterations, with a documented justification for every hyperparameter change.
-3. **R² (test) = 0.88** and **MAE = 1.03 °C** were achieved by the baseline; the re-trained model improved generalisation (CV R² rose from 0.868 → 0.874).
-4. The **train / test split (885 / 222)** is explicitly documented, and a train-vs-test comparison exposes the overfitting pattern.
-5. **Feature importance** confirms a physically interpretable model.
-6. All models and reports are serialised in [`models/`](models/) and [`reports/`](reports/), ready for direct comparison in Phase III.
+1. **A single supervised algorithm — Random Forest Regressor — was successfully trained**, in line with the professor's brief ("any one of the algorithms").
+2. The **train / test split (885 / 222)** is explicit and reproducible.
+3. The trained model achieves **MAE = 1.03 °C** and **R² (test) = 0.88** on held-out data.
+4. The **feature-importance ranking is physically interpretable**, confirming the model learned meaningful signal.
+5. All artifacts (trained model, scaler, training log, plots) are serialised in [`models/`](models/) and [`reports/`](reports/), ready for the next phase.
+
+---
+
+# 🔮 PHASE III — Analysis and Evaluation (planned)
+
+Phase III is **not yet executed**. It will focus on:
+
+- **In-depth evaluation** of the trained model: 5-fold / k-fold cross-validation, train-vs-test gap analysis, error distribution per class / city, residual diagnostics.
+- **Re-training** with improved configurations — systematic hyperparameter search (e.g., GridSearchCV / RandomizedSearchCV), anti-overfitting adjustments (`min_samples_leaf`, `max_features`), and feature engineering (lag features, per-city encodings).
+- **Comparison against the Phase II baseline**, quantifying the concrete improvement contributed by the re-training step.
+- **Conclusions and outlook** — interpretation of results, who benefits, and potential future work.
