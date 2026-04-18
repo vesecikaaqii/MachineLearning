@@ -148,14 +148,6 @@ Build a **supervised Machine-Learning pipeline** that ingests real meteorologica
 | 3. Model training (Phase II) | Train a **Random Forest Regressor** — a supervised, non-linear regression algorithm |
 | 4. Analysis and re-training (Phase III) | Evaluate, tune hyperparameters, improve generalisation |
 
-### Who benefits
-- **Students & researchers** — a fully documented, reproducible academic example of an end-to-end ML project.
-- **Local meteorology enthusiasts** — a model tuned specifically for Kosovo's micro-climates.
-- **Future extensions** — the same pipeline can be adapted for humidity forecasting, weather-state classification, or clustering cities by climate profile.
-
-### Key outcome so far
-The baseline Random Forest achieves **R² ≈ 0.85** and **MAE ≈ 1 °C** on held-out data — a useful accuracy level for short-horizon temperature prediction.
-
 ---
 
 # PHASE I — Model Preparation
@@ -476,7 +468,7 @@ The points cluster tightly along the ideal diagonal (dashed line) — the model 
 
 ## Phase II Conclusions
 
-1. **A single supervised algorithm — Random Forest Regressor — was successfully trained**, in line with the professor's brief ("any one of the algorithms").
+1. **A single supervised algorithm — Random Forest Regressor — was successfully trained**.
 2. The **train / test split (885 / 222)** is explicit and reproducible.
 3. The trained model achieves **MAE = 1.03 °C** and **R² (test) = 0.88** on held-out data.
 4. The **feature-importance ranking is physically interpretable**, confirming the model learned meaningful signal.
