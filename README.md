@@ -16,6 +16,7 @@
 
 ## Contributors
 Vesë Cikaqi, Uranik Hodaj, Dafina Keqmezi
+
 Academic Year: 2025 / 2026
 
 ---
