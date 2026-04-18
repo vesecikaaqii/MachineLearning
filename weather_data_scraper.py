@@ -80,8 +80,8 @@ def fetch_historical_weather():
 
         df_final = df_final.head(30000)
 
-        file_name = "kosovo_historical_weather.csv"
-        df_final.to_parquet(file_name, index=False)
+        file_name = "kosovo_weather_dataset.csv"
+        df_final.to_csv(file_name, index=False)
         
         logging.info(f"✅ Success! Exact rows to {file_name}.")
     else:
