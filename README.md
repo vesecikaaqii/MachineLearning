@@ -15,7 +15,7 @@
 ---
 
 ## Contributors
-Vesë Cikaqi, Uranik Hodaj, Dafina Keqmezi
+Dafina Keqmezi, Vesë Cikaqi, Uranik Hodaj
 
 Academic Year: 2025 / 2026
 
@@ -27,7 +27,7 @@ A Machine Learning project that builds a complete, reproducible pipeline — fro
 
 ---
 
-## 📚 Table of Contents
+## Table of Contents
 
 1. [Project Goals](#-1-project-goals)
 2. [Technologies Used](#-2-technologies-used)
@@ -43,26 +43,13 @@ A Machine Learning project that builds a complete, reproducible pipeline — fro
 
 | Phase | Title | Status |
 |-------|-------|--------|
-| I  | **Model Preparation** — data collection, cleaning, EDA, task definition | ✅ Completed |
-| II | **Model Training** — train a single supervised algorithm | ✅ Completed |
-| III | **Analysis and Evaluation** — evaluate, re-train, improve | 🔜 Planned |
+| I  | **Model Preparation** — data collection, cleaning, EDA, task definition | Completed |
+| II | **Model Training** — train a single supervised algorithm | Completed |
+| III | **Analysis and Evaluation** — evaluate, re-train, improve | Planned |
 
 ---
 
-## 🎯 1. Project Goals
-
-The project is designed to fulfil both the educational and applied objectives of a Master-level Machine Learning course:
-
-1. **Build a complete supervised ML pipeline** — from raw data collection to trained, evaluated models — for the task of **air-temperature forecasting** in Kosovo.
-2. **Collect a real, domain-specific dataset** from a public meteorological API, covering all 27 municipalities of Kosovo.
-3. **Apply and justify one ML algorithm** (as required by the course brief) — demonstrating supervised learning for a regression task.
-4. **Demonstrate the re-training methodology** by explicitly iterating hyperparameters and comparing baseline vs. re-trained configurations.
-5. **Produce publishable, reproducible artifacts** — serialised models, evaluation metrics, and visual reports — suitable for academic review.
-6. **Create the foundation for Phase III** — where the same algorithm will be further optimised with automated hyperparameter search, feature engineering, and cross-validated tuning.
-
----
-
-## 🛠️ 2. Technologies Used
+## 2. Technologies Used
 
 | Category | Tool / Library | Purpose |
 |----------|----------------|---------|
@@ -77,7 +64,7 @@ The project is designed to fulfil both the educational and applied objectives of
 
 ---
 
-## ⚙️ 3. Installation and Setup
+## 3. Installation and Setup
 
 ### Prerequisites
 - Python ≥ 3.10
@@ -91,7 +78,7 @@ The project is designed to fulfil both the educational and applied objectives of
 git clone https://github.com/<user>/MachineLearning.git
 cd MachineLearning
 
-# 2. Create a virtual environment (recommended)
+# 2. Create a virtual environment 
 python -m venv .venv
 source .venv/bin/activate         # Linux / macOS / Git-Bash on Windows
 # or
@@ -100,13 +87,11 @@ source .venv/bin/activate         # Linux / macOS / Git-Bash on Windows
 # 3. Install dependencies
 pip install pandas numpy matplotlib seaborn scikit-learn joblib requests
 
-# 4. (Optional) Re-collect data from OpenWeatherMap
-#    Replace the API_KEY inside weather_data_scraper.py with your own,
-#    then:
-python weather_data_scraper.py
-#    This (re)creates / appends to kosovo_weather_dataset.csv
+# 4. Re-collect data from OpenWeatherMap
 
-# 5. Run the Phase II training + evaluation pipeline
+python weather_data_scraper.py
+
+# 5. Run the Phase II training 
 python phase2_model_training.py
 ```
 
@@ -114,21 +99,19 @@ python phase2_model_training.py
 
 ```
 models/
-├── rf_baseline.pkl          # Baseline Random Forest (100 trees)
-├── rf_retrained.pkl         # Re-trained Random Forest (300 trees, tuned)
-└── scaler_phase2.pkl        # Fitted StandardScaler (pipeline-compatible)
+├── rf_model.pkl         
+└── scaler_phase2.pkl       
 
 reports/
-├── phase2_metrics.txt              # Full training log
-├── phase2_summary.json             # Machine-readable metric summary
-├── phase2_correlation_heatmap.png  # Feature correlation heat-map
-├── phase2_feature_importance.png   # RF feature-importance chart
-└── phase2_pred_vs_true.png         # Predicted vs. actual scatter
+├── phase2_training_summary.json             
+├── phase2_correlation_heatmap.png  
+├── phase2_feature_importance.png   
+└── phase2_pred_vs_true.png         
 ```
 
 ---
 
-## 🗂️ 4. Dataset Description
+## 4. Dataset Description
 
 | Property | Value |
 |----------|-------|
@@ -149,12 +132,38 @@ reports/
 
 ---
 
-# 🧩 PHASE I — Model Preparation
+## About the Project
 
-## 🎯 Objective of the Phase
+### The problem
+Accurate short-term temperature forecasts are essential for agriculture planning, energy demand prediction, public-health advisories, and daily citizen decisions. Commercial weather services provide generic forecasts, but **small, region-specific models tuned on local data** often capture micro-climatic behaviour (e.g. the urban-heat-island effect in Pristina, or the cooler mountain valleys around Dragash) more faithfully than global models.
+
+### The idea
+Build a **supervised Machine-Learning pipeline** that ingests real meteorological data from the [OpenWeatherMap API](https://openweathermap.org/api) for all 27 municipalities of Kosovo and learns to **predict the air temperature** (°C) from other observable variables — humidity, pressure, wind speed, cloud coverage, precipitation probability, and the time of day.
+
+### The approach
+| Step | Action |
+|------|--------|
+| 1. Data collection | Scrape 5-day, 3-hour-interval forecasts + live snapshots for all 27 cities |
+| 2. Model preparation (Phase I) | Clean, explore, engineer cyclic time features, define the ML task |
+| 3. Model training (Phase II) | Train a **Random Forest Regressor** — a supervised, non-linear regression algorithm |
+| 4. Analysis and re-training (Phase III) | Evaluate, tune hyperparameters, improve generalisation |
+
+### Who benefits
+- **Students & researchers** — a fully documented, reproducible academic example of an end-to-end ML project.
+- **Local meteorology enthusiasts** — a model tuned specifically for Kosovo's micro-climates.
+- **Future extensions** — the same pipeline can be adapted for humidity forecasting, weather-state classification, or clustering cities by climate profile.
+
+### Key outcome so far
+The baseline Random Forest achieves **R² ≈ 0.85** and **MAE ≈ 1 °C** on held-out data — a useful accuracy level for short-horizon temperature prediction.
+
+---
+
+# PHASE I — Model Preparation
+
+## Objective of the Phase
 Phase I lays the foundation of the whole project: **collecting, structuring, and performing the initial preparation of a real meteorological dataset for Kosovo**, and defining the ML task the model will later solve. Preparing the model means preparing *everything the model will need* — clean data, well-understood features, a clearly stated target, and a justified algorithm family — before any training takes place.
 
-## 🛠️ Tasks Performed
+## Tasks Performed
 
 1. **Identification of the data source** — [OpenWeatherMap API](https://openweathermap.org/api) was chosen as a trusted, publicly accessible source for global meteorological forecasts.
 2. **Selection of 27 municipalities of Kosovo** with their (lat, lon) coordinates to cover all regions.
@@ -164,7 +173,7 @@ Phase I lays the foundation of the whole project: **collecting, structuring, and
 4. **Persistence to CSV** as [`kosovo_weather_dataset.csv`](kosovo_weather_dataset.csv), automatically appending the columns `hour`, `day`, and `month` for temporal analysis.
 5. **Integrity verification** (no duplicates, no empty rows in the primary target columns).
 
-## 🎯 Defined Machine-Learning Tasks
+## Defined Machine-Learning Tasks
 
 The dataset built in this phase is designed to support three main ML tasks across the later phases:
 
@@ -174,7 +183,7 @@ The dataset built in this phase is designed to support three main ML tasks acros
 | 2 | Weather-state classification | Classification (supervised) | `weather` (Clear / Clouds / Rain / Snow) | temperature, humidity, clouds, pop |
 | 3 | Sequential time-series forecasting | Time-series (future work) | `temperature[t+1]` | 6-step × 5-feature sequence |
 
-## 🗂️ Attribute Types
+## Attribute Types
 
 Out of 20 total columns, the structural split is:
 
@@ -186,7 +195,7 @@ Out of 20 total columns, the structural split is:
 | **Textual** | 1 | `description` (free-text, not used for training) |
 | **Datetime** | 1 | `datetime` (ISO 8601) |
 
-## 📊 Descriptive Statistics (numeric attributes)
+## Descriptive Statistics (numeric attributes)
 
 | Attribute | min | mean | std | max |
 |-----------|-----|------|-----|-----|
@@ -206,11 +215,11 @@ Out of 20 total columns, the structural split is:
 | Clouds | 686 | 61.97 % |
 | Rain   | 242 | 21.86 % |
 | Clear  | 170 | 15.36 % |
-| Snow   | 9   | **0.81 %** ⚠️ |
+| Snow   | 9   | 0.81 %|
 
-➡️ A clear **class imbalance** is observed (the `Snow` class is heavily under-represented) — a limitation that will be addressed in Phase III using oversampling techniques.
+A clear **class imbalance** is observed (the `Snow` class is heavily under-represented) — a limitation that will be addressed in Phase III using oversampling techniques.
 
-## 🧼 Missing Values
+## Missing Values
 
 | Column | Missing | Reason | Treatment |
 |--------|---------|--------|-----------|
@@ -219,7 +228,7 @@ Out of 20 total columns, the structural split is:
 
 **Total NaN in the dataset: 27 / (1107 × 20 = 22,140 cells) → 0.12 %** — very high data quality.
 
-## 💡 Why these attributes?
+## Why these attributes?
 
 - **Core meteorological variables** (`temperature`, `humidity`, `pressure`, `wind_*`, `clouds`) — standard physical inputs for atmospheric modelling.
 - **`pop` and `visibility`** — precipitation / visibility indicators, useful for weather classification.
@@ -227,7 +236,7 @@ Out of 20 total columns, the structural split is:
 - **`city`** — enables per-city modelling or regional climate grouping.
 - **lat / lon coordinates** are not stored in the CSV because they are static per city and can be re-joined from `weather_data_scraper.py`.
 
-## ✅ Phase I Outcome
+## Phase I Outcome
 
 A complete, clean, and well-structured foundation for Kosovo weather modelling:
 - **1107 instances × 20 attributes**, only **0.12 % NaN** (easily handled),
@@ -238,7 +247,7 @@ A complete, clean, and well-structured foundation for Kosovo weather modelling:
 
 ---
 
-## 📁 Dataset Overview and Exploratory Insights
+## Dataset Overview and Exploratory Insights
 
 ### Dataset at a Glance
 
@@ -252,7 +261,7 @@ A complete, clean, and well-structured foundation for Kosovo weather modelling:
 | Temporal resolution | 3 hours |
 | Coverage horizon | 5 days |
 
-### 🌍 Cities Analysed (sample)
+### Cities Analysed (sample)
 
 | City | Region |
 |------|--------|
@@ -264,7 +273,7 @@ A complete, clean, and well-structured foundation for Kosovo weather modelling:
 | Ferizaj | Ferizaj |
 | Gjilan | Gjilan |
 
-### 📈 Real Statistics Extracted from the Dataset (sample)
+### Real Statistics Extracted from the Dataset (sample)
 
 | City | Min Temp (°C) | Max Temp (°C) | Humidity (%) | Weather |
 |------|---------------|---------------|--------------|---------|
@@ -274,7 +283,7 @@ A complete, clean, and well-structured foundation for Kosovo weather modelling:
 | Gjakova  | ~6.50 | ~15.50 | 45 – 80 | Clear |
 | Mitrovica | ~5.50 | ~13.00 | 50 – 85 | Clouds |
 
-### ⏱️ Temporal Structure
+### Temporal Structure
 
 | Date | Intervals |
 |------|-----------|
@@ -284,7 +293,7 @@ A complete, clean, and well-structured foundation for Kosovo weather modelling:
 | 2026-03-26 | every 3 hours |
 | 2026-03-27 | every 3 hours |
 
-### 📊 Sample Raw Records
+### Sample Raw Records
 
 | City | Type | Datetime | Temp (°C) | Humidity (%) | Weather |
 |------|------|----------|-----------|--------------|---------|
@@ -292,7 +301,7 @@ A complete, clean, and well-structured foundation for Kosovo weather modelling:
 | Pristina | forecast | 2026-03-24 01:00 | 5.60 | 90 | Clouds |
 | Pristina | forecast | 2026-03-25 13:00 | 13.58 | 44 | Clear |
 
-### 🌡️ Temperature Analysis
+### Temperature Analysis
 
 | Category | Result |
 |----------|--------|
@@ -301,7 +310,7 @@ A complete, clean, and well-structured foundation for Kosovo weather modelling:
 | Average difference | ~7 °C – 10 °C |
 | Observed phenomenon | Urban Heat Island effect |
 
-### 💨 Wind and Pressure Analysis
+### Wind and Pressure Analysis
 
 | Parameter | Range |
 |-----------|-------|
@@ -309,7 +318,7 @@ A complete, clean, and well-structured foundation for Kosovo weather modelling:
 | Pressure | 1010 – 1018 hPa |
 | Wind Direction | 0° – 360° |
 
-### 💧 Humidity Analysis
+### Humidity Analysis
 
 | Parameter | Value |
 |-----------|-------|
@@ -317,7 +326,7 @@ A complete, clean, and well-structured foundation for Kosovo weather modelling:
 | Maximum humidity | ~90 % |
 | Mean | ~65 % |
 
-### 🌧️ Probability of Precipitation
+### Probability of Precipitation
 
 | Parameter | Value |
 |-----------|-------|
@@ -327,20 +336,20 @@ A complete, clean, and well-structured foundation for Kosovo weather modelling:
 
 ---
 
-## 🤖 Selected Algorithm
+## Selected Algorithm
 
 In accordance with the professor's brief (*"Students must implement **any one** of the applicable ML algorithms..."*), the project focuses on a **single algorithm**: **Random Forest Regressor** — an ensemble of decision trees for regression (supervised learning).
 
 | Phase | Random Forest Configuration | Status |
 |-------|----------------------------|--------|
-| Phase II | Baseline training (100 trees, default leaf, random_state = 42) | ✅ Completed |
-| Phase III | Re-training + evaluation (hyperparameter tuning with GridSearchCV, anti-overfitting, feature engineering) | 🔜 Planned |
+| Phase II | Baseline training (100 trees, default leaf, random_state = 42) | Completed |
+| Phase III | Re-training + evaluation (hyperparameter tuning with GridSearchCV, anti-overfitting, feature engineering) | Planned |
 
 ---
 
-# 🧪 PHASE II — Model Training
+# PHASE II — Model Training
 
-## 🎯 Objective of the Phase
+## Objective of the Phase
 
 Phase II is strictly the **training** step of the ML workflow: a single supervised algorithm (**Random Forest Regressor**) is trained on the prepared dataset from Phase I. Evaluation in depth, re-training, and hyperparameter iteration are **deferred to Phase III** — this phase focuses on producing a correctly trained model together with the preprocessing pipeline around it.
 
@@ -348,15 +357,15 @@ Phase II is strictly the **training** step of the ML workflow: a single supervis
 - **Training log:** [`reports/phase2_training_log.txt`](reports/phase2_training_log.txt)
 - **Machine-readable summary:** [`reports/phase2_training_summary.json`](reports/phase2_training_summary.json)
 
-## 📸 Phase II Visualisations
+## Phase II Visualisations
 
 Three visualisations are produced during training:
 
 <table>
   <tr>
-    <td align="center"><b>🔥 Correlation Heat-map</b></td>
-    <td align="center"><b>📈 Predicted vs. Actual</b></td>
-    <td align="center"><b>🌲 Feature Importance</b></td>
+    <td align="center"><b> Correlation Heat-map</b></td>
+    <td align="center"><b> Predicted vs. Actual</b></td>
+    <td align="center"><b> Feature Importance</b></td>
   </tr>
   <tr>
     <td><img src="reports/phase2_correlation_heatmap.png" alt="Correlation Heatmap" width="320"/></td>
@@ -370,7 +379,7 @@ Three visualisations are produced during training:
   </tr>
 </table>
 
-## 🌳 Why Random Forest Regressor?
+## Why Random Forest Regressor?
 
 | Reason | Explanation |
 |--------|-------------|
@@ -380,7 +389,7 @@ Three visualisations are produced during training:
 | **No feature scaling required** | Trees are scale-invariant — this simplifies the pipeline and reduces the risk of pre-processing mistakes. |
 | **Interpretability** | Provides built-in **feature importances**, helping verify that the model learned physically meaningful relationships, not artefacts. |
 
-## 🧹 Data Preprocessing
+## Data Preprocessing
 
 1. **Drop rows with missing values** in `temperature`, `humidity`, `pressure` (the primary features).
 2. **Fill `pop`** with `0.0` for `type = current` rows (where the API does not return this field).
@@ -389,7 +398,7 @@ Three visualisations are produced during training:
 4. **80 / 20 train / test split** with `random_state = 42` for reproducibility.
 5. **`StandardScaler`** is fitted on the training set and saved for future pipeline compatibility; Random Forest itself does not require scaling.
 
-### 📊 Split sizes
+### Split sizes
 
 | Split | Row count | Share |
 |-------|-----------|-------|
@@ -397,13 +406,13 @@ Three visualisations are produced during training:
 | **Test**  | **222** | 20 % |
 | **Total** | 1107 | 100 % |
 
-### 🧾 Input features (11)
+### Input features (11)
 
 `humidity, pressure, wind_speed, wind_deg, clouds, visibility, pop, hour_sin, hour_cos, month_sin, month_cos`
 
 **Target:** `temperature` (°C, numeric).
 
-## 🔎 Correlation heat-map (produced during training)
+## Correlation heat-map (produced during training)
 
 ![Correlation Heatmap](reports/phase2_correlation_heatmap.png)
 
@@ -416,9 +425,9 @@ Three visualisations are produced during training:
 | `visibility` | 0.173 |
 | `pop`        | 0.147 |
 
-➡️ Humidity is the strongest predictor — a physically expected result, since warmer air typically holds less relative humidity.
+Humidity is the strongest predictor — a physically expected result, since warmer air typically holds less relative humidity.
 
-## ⚙️ Training Configuration
+## Training Configuration
 
 | Hyperparameter | Value |
 |----------------|-------|
@@ -430,7 +439,7 @@ Three visualisations are produced during training:
 
 The baseline configuration is a deliberately *simple* Random Forest — reasonable defaults, no tuning. Tuning is reserved for Phase III where it belongs.
 
-## 📊 Training Results
+## Training Results
 
 | Metric | Value |
 |--------|-------|
@@ -439,13 +448,13 @@ The baseline configuration is a deliberately *simple* Random Forest — reasonab
 | R² (train)  | 0.9828 |
 | R² (test)   | **0.8831** |
 
-### 📈 Predicted vs. Actual
+### Predicted vs. Actual
 
 ![Predicted vs Actual Temperature](reports/phase2_pred_vs_true.png)
 
 The points cluster tightly along the ideal diagonal (dashed line) — the model matches the actual temperature closely. Larger deviations appear only at the extremes (very hot / very cold), which are under-represented in the dataset.
 
-### 🔥 Feature Importance
+### Feature Importance
 
 ![Feature Importance](reports/phase2_feature_importance.png)
 
@@ -463,9 +472,9 @@ The points cluster tightly along the ideal diagonal (dashed line) — the model 
 | `month_sin`  | ~0.000 |
 | `month_cos`  | ~0.000 |
 
-➡️ Humidity dominates the temperature prediction, followed by pressure and clouds — results consistent with atmospheric physics. `month_*` are effectively zero because the dataset spans only ~5 days.
+ Humidity dominates the temperature prediction, followed by pressure and clouds — results consistent with atmospheric physics. `month_*` are effectively zero because the dataset spans only ~5 days.
 
-## 🧾 Phase II Conclusions
+## Phase II Conclusions
 
 1. **A single supervised algorithm — Random Forest Regressor — was successfully trained**, in line with the professor's brief ("any one of the algorithms").
 2. The **train / test split (885 / 222)** is explicit and reproducible.
@@ -475,7 +484,7 @@ The points cluster tightly along the ideal diagonal (dashed line) — the model 
 
 ---
 
-# 🔮 PHASE III — Analysis and Evaluation (planned)
+# PHASE III — Analysis and Evaluation (planned)
 
 Phase III is **not yet executed**. It will focus on:
 

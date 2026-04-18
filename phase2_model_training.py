@@ -1,36 +1,3 @@
-"""
-Phase II - Model Training
-
-This phase implements ONLY the training of a single supervised-learning
-algorithm on the Kosovo weather dataset.  Analysis, evaluation, and
-re-training (iterative improvement) are scheduled for Phase III.
-
-Algorithm
----------
-Random Forest Regressor - an ensemble of decision trees chosen because:
-  * the task is a *supervised regression* (target = temperature, numeric);
-  * relationships among humidity / pressure / clouds / temperature are
-    non-linear, a setting where tree ensembles excel;
-  * it is robust to outliers and scale-free (no feature scaling required);
-  * it exposes interpretable feature importances.
-
-Task
-----
-    Input  : meteorological features (humidity, pressure, wind, clouds,
-             visibility, precipitation probability, cyclic hour/month)
-    Output : air temperature in degrees Celsius
-
-Artifacts (./models/ and ./reports/)
-------------------------------------
-    models/rf_model.pkl            - trained Random Forest
-    models/scaler_phase2.pkl       - fitted StandardScaler
-    reports/phase2_training_log.txt       - full training log
-    reports/phase2_training_summary.json  - machine-readable summary
-    reports/phase2_correlation_heatmap.png
-    reports/phase2_feature_importance.png
-    reports/phase2_pred_vs_true.png
-"""
-
 import os
 import json
 import warnings
@@ -77,7 +44,6 @@ df["datetime"] = pd.to_datetime(df["datetime"])
 df = df.dropna(subset=["temperature", "humidity", "pressure"]).reset_index(drop=True)
 df["pop"] = df["pop"].fillna(0.0)
 
-# Cyclic encoding of hour/month - prevents the "23 -> 0 = big jump" artefact
 df["hour_sin"]  = np.sin(2 * np.pi * df["hour"]  / 24.0)
 df["hour_cos"]  = np.cos(2 * np.pi * df["hour"]  / 24.0)
 df["month_sin"] = np.sin(2 * np.pi * df["month"] / 12.0)
@@ -96,7 +62,7 @@ log(f"Target              : {TARGET} (deg C)")
 
 
 # ---------------------------------------------------------------------------
-# 2. EDA  ->  correlation heat-map
+# 2. EDA  -
 # ---------------------------------------------------------------------------
 corr_cols = ["temperature", "humidity", "pressure", "wind_speed",
              "clouds", "visibility", "pop"]
@@ -123,8 +89,6 @@ X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.20, random_state=42
 )
 
-# Scaler is fitted on train only, saved for pipeline compatibility.
-# Random Forest itself does not need scaling.
 scaler = StandardScaler().fit(X_train)
 joblib.dump(scaler, os.path.join(MODELS_DIR, "scaler_phase2.pkl"))
 
@@ -132,7 +96,7 @@ log(f"\nTrain / Test split  : {len(X_train)} / {len(X_test)}  (80% / 20%)")
 
 
 # ---------------------------------------------------------------------------
-# 4. TRAIN THE MODEL   (single training run - no re-training here)
+# 4. TRAIN THE MODEL   
 # ---------------------------------------------------------------------------
 cfg = dict(n_estimators=100, max_depth=None, min_samples_leaf=1,
            random_state=42, n_jobs=-1)
@@ -165,7 +129,7 @@ log(f"  R^2 (test)  : {r2_te:.4f}")
 # ---------------------------------------------------------------------------
 joblib.dump(model, os.path.join(MODELS_DIR, "rf_model.pkl"))
 
-# -- feature importance -----------------------------------------------------
+
 imp = pd.Series(model.feature_importances_, index=FEATURES).sort_values()
 plt.figure(figsize=(7, 5))
 imp.plot(kind="barh", color="steelblue")
@@ -177,7 +141,6 @@ plt.close()
 log("\nFeature importance:")
 log(imp.sort_values(ascending=False).to_string())
 
-# -- predicted vs actual ----------------------------------------------------
 plt.figure(figsize=(6, 6))
 plt.scatter(y_test, y_pred_test, alpha=0.55, s=18, color="steelblue",
             label="predictions")
