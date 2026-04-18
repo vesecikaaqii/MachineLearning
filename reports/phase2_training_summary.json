@@ -1,0 +1,45 @@
+{
+  "phase": "II - Model Training",
+  "algorithm": "RandomForestRegressor",
+  "rows_used": 20736,
+  "train_size": 16588,
+  "test_size": 4148,
+  "features": [
+    "humidity",
+    "pressure",
+    "wind_speed",
+    "wind_deg",
+    "clouds",
+    "pop",
+    "hour_sin",
+    "hour_cos",
+    "month_sin",
+    "month_cos"
+  ],
+  "target": "temperature",
+  "config": {
+    "n_estimators": 100,
+    "max_depth": null,
+    "min_samples_leaf": 1,
+    "random_state": 42,
+    "n_jobs": -1
+  },
+  "metrics": {
+    "MAE": 1.081607762777242,
+    "RMSE": 1.563636037236001,
+    "R2_train": 0.9856958364899794,
+    "R2_test": 0.9002999347390765
+  },
+  "feature_importance": {
+    "humidity": 0.4739415684860063,
+    "month_cos": 0.09730615760088347,
+    "month_sin": 0.09498476055747941,
+    "pressure": 0.06855863231502353,
+    "hour_cos": 0.061890939291510655,
+    "hour_sin": 0.05675278609802287,
+    "wind_deg": 0.050496805720971635,
+    "clouds": 0.050348402840139604,
+    "wind_speed": 0.04103973251942856,
+    "pop": 0.0046802145705340135
+  }
+}

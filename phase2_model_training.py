@@ -36,6 +36,17 @@ log("=" * 70)
 
 df = pd.read_csv(DATA_PATH)
 df["datetime"] = pd.to_datetime(df["datetime"])
+
+df = df.rename(columns={
+    "temperature_2m":      "temperature",
+    "relative_humidity_2m": "humidity",
+    "surface_pressure":    "pressure",
+    "wind_speed_10m":      "wind_speed",
+    "wind_direction_10m":  "wind_deg",
+    "cloud_cover":         "clouds",
+    "precipitation":       "pop",
+})
+
 df = df.dropna(subset=["temperature", "humidity", "pressure"]).reset_index(drop=True)
 df["pop"] = df["pop"].fillna(0.0)
 
@@ -46,17 +57,17 @@ df["month_cos"] = np.cos(2 * np.pi * df["month"] / 12.0)
 
 FEATURES = [
     "humidity", "pressure", "wind_speed", "wind_deg",
-    "clouds", "visibility", "pop",
+    "clouds", "pop",
     "hour_sin", "hour_cos", "month_sin", "month_cos",
 ]
 TARGET = "temperature"
 
 log(f"Rows after cleaning : {len(df)}")
-log(f"Features (11)       : {FEATURES}")
+log(f"Features ({len(FEATURES)})       : {FEATURES}")
 log(f"Target              : {TARGET} (deg C)")
 
 corr_cols = ["temperature", "humidity", "pressure", "wind_speed",
-             "clouds", "visibility", "pop"]
+             "clouds", "pop"]
 corr = df[corr_cols].corr()
 
 plt.figure(figsize=(7, 5))
