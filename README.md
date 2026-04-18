@@ -12,6 +12,7 @@
  </tr>
 </table>
 
+
 ---
 
 ## Contributors
@@ -477,6 +478,7 @@ The points cluster tightly along the ideal diagonal (dashed line) — the model 
 ---
 
 # PHASE III — Analysis and Evaluation (planned)
+
 
 Phase III is **not yet executed**. It will focus on:
 
