@@ -1,0 +1,18 @@
+{
+  "best_params": {
+    "hidden": 64,
+    "seq_len": 8,
+    "dropout": 0.1,
+    "lr": 0.004403929595053136,
+    "batch_size": 16
+  },
+  "cv_rmse_scaled": 0.18927960633336186,
+  "test_metrics_celsius": {
+    "MAE": 0.42144673191813325,
+    "RMSE": 0.5990958906910671,
+    "R2": 0.9798994956224779
+  },
+  "final_epochs": 53,
+  "n_trials": 25,
+  "cv_splits": 5
+}

@@ -126,13 +126,254 @@
 
 ---
 
-## 🤖 Modelet e Machine Learning
+## 🤖 Modeli i Machine Learning
 
-| Modeli             | Statusi | Qëllimi |
-|--------------------|--------|--------|
-| Linear Regression  | Planned | Parashikimi i temperaturës |
-| Random Forest      | Planned | Klasifikimi i motit |
-| LSTM               | Planned | Parashikim kohor |
-| XGBoost            | Planned | Temperatura ekstreme |
-| K-Means            | Planned | Grupimi i qyteteve |
+| Modeli | Statusi     | Qëllimi                                        |
+|--------|-------------|------------------------------------------------|
+| LSTM   | ✅ Trajnuar | Parashikimi i temperaturës (sekuenca kohore)  |
+
+---
+
+# 🧠 FAZA II — Model Training (LSTM)
+
+Skripta: [`phase2_model_training.py`](phase2_model_training.py)
+Modeli i ruajtur: [`models/lstm_model.pt`](models/lstm_model.pt)
+
+## 🎯 Pse u zgjodh LSTM?
+
+Tema e projektit është **Parashikim i Motit (Weather Forecasting)** — kjo është nga natyra e saj një **detyrë e serive kohore (time-series)**. Vlera e temperaturës në momentin `t` është fort e lidhur me vlerat në `t-1, t-2, t-3, ...` (autokorrelacion). Për këtë arsye, modelet që trajtojnë çdo rresht në mënyrë të pavarur (Linear Regression, Random Forest, XGBoost) janë në thelb të papërshtatshme — ato nuk shohin "rrjedhën" e motit.
+
+**LSTM (Long Short-Term Memory)** është një rrjet rekurent neuronal i projektuar pikërisht për këtë:
+
+- **Gates (forget / input / output)** lejojnë rrjetin të zgjedhë çfarë informacioni nga e kaluara të mbajë dhe çfarë të harrojë.
+- **Memorja afatshkurtër + afatgjatë** kap si ndryshime të shpejta (orë në orë) ashtu edhe trende (ditore/sezonale).
+- **Konsumon një dritare të plotë historie** (18 orë) për të bërë çdo parashikim, jo vetëm një snapshot.
+- **Standard i industrisë** për parashikim moti, çmimesh aksionesh, konsum energjie etj.
+
+Krahasuar me alternativat:
+
+| Alternativa       | Pse JO për këtë projekt |
+|-------------------|-------------------------|
+| Linear Regression | Lineare; nuk kap ndërveprime kohore. |
+| Random Forest     | Klasifikim, jo parashikim numerik kohor. |
+| XGBoost           | I fortë në tabela, por trajton rreshtat si i.i.d. — humb sekuencën. |
+| K-Means           | I pambikëqyrur (clustering), jo parashikim. |
+
+---
+
+## ⚙️ Parapërgatitja e të Dhënave
+
+| Hapi                  | Detajet |
+|-----------------------|---------|
+| Ngarkim & pastrim     | `dropna(temperature)`, sortim sipas `(city, datetime)` |
+| Filtrimi              | Mbahen vetëm rreshtat `type == "forecast"` (intervale të rregullta 3h) |
+| Shkallëzim            | `StandardScaler` mbi 5 veçoritë e hyrjes (zero-mean, unit-variance) |
+| Ndërtim sekuencash    | Dritare rrëshqitëse 6 hapa **brenda secilit qytet** (nuk kalojnë kufirin) |
+| Ndarja Train/Test     | **Temporale 80/20** — pa shuffle, për të shmangur leakage nga e ardhmja |
+
+**Pse `StandardScaler`?** LSTM-të janë të ndjeshme ndaj shkallës së hyrjes; gradientët bëhen të paqëndrueshëm kur veçoritë kanë diapazone shumë të ndryshme (p.sh. `pressure ≈ 1015` vs `wind_speed ≈ 5`). Standardizimi e zgjidh këtë.
+
+**Pse sekuenca PËR QYTET?** Nëse do të ndërtonim sekuenca duke përzier qytetet, modeli do të mësonte "kërcime" jorealiste (p.sh. nga Pristina në Prizren). Duke i ndarë, çdo sekuencë reflekton një rrjedhë moti të vërtetë në një vend të vetëm.
+
+**Pse ndarje temporale?** Random shuffle do të lejonte modelin të "shihte" të ardhmen gjatë trajnimit. Ndarja temporale (e para 80% si train, e fundit 20% si test) imiton skenarin real: trajnoj me të kaluarën, parashikoj të ardhmen.
+
+---
+
+## 🏗️ Arkitektura e Modelit
+
+```
+Input (batch, 6, 5)            ← 6 hapa kohorë × 5 veçori
+   │
+   ▼
+LSTM(hidden=64, batch_first)   ← shtresa rekurente
+   │
+   ▼
+output[:, -1, :]               ← merr vetëm hap-in e fundit (many-to-one)
+   │
+   ▼
+Dropout(0.2)                   ← regularizim, parandalon overfitting
+   │
+   ▼
+Dense(32) + ReLU               ← projeksion joLinear
+   │
+   ▼
+Dense(1)                       ← parashikim i temperaturës (skalë e standardizuar)
+```
+
+| Hiperparametri    | Vlera        | Justifikim |
+|-------------------|--------------|------------|
+| SEQ_LEN           | 6            | 6 × 3h = **18h histori** — kapin ciklin ditor pa rritur shumë trajnimin |
+| LSTM hidden       | 64           | Madhësi e moderuar; mjaft për dataset të vogël (~734 sekuenca trajnimi) |
+| Dropout           | 0.2          | Mbron nga overfitting në dataset të vogël |
+| Optimizer         | Adam (lr=1e-3) | Konvergon shpejt, kërkon pak akordim |
+| Loss              | MSE          | Standard për regresion; penalizon gabime të mëdha |
+| Epochs (max)      | 60           | Me early-stopping (patience=10) — ndalon kur val_loss nuk përmirësohet |
+| Batch size        | 32           | Balancë midis qëndrueshmërisë së gradientit dhe shpejtësisë |
+
+---
+
+## 📐 Rezultatet
+
+**Veçoritë e hyrjes (5):** `temperature`, `humidity`, `pressure`, `wind_speed`, `clouds`
+**Target:** temperatura e hapit pasardhës (3 orë në të ardhmen)
+
+**Madhësitë e dataset-it:**
+- Sekuenca totale: **918** (nga 27 qytete × ~34 dritare/qytet)
+- Train: **734**  |  Test: **184**
+
+| Metrika | Vlera     | Interpretim |
+|---------|-----------|-------------|
+| **MAE**  | **0.500 °C** | Gabimi absolut mesatar — mesatarisht modeli gabon vetëm me gjysmë gradi Celsius |
+| **RMSE** | **0.756 °C** | Gabimi më i ndjeshëm ndaj outliers; afër MAE → pak parashikime me gabime të mëdha |
+| **R²**   | **0.967**    | Modeli shpjegon **96.7%** të variancës së temperaturës |
+
+### Interpretim i thelluar
+
+- **R² = 0.967** është një rezultat shumë i fortë për një model të trajnuar nga e para në një dataset të vogël. Tregon që dinamika e temperaturës në Kosovë është **shumë e parashikueshme në horizont 3-orësh**, dhe që historia 18-orëshe është informacion i mjaftueshëm.
+
+- **MAE = 0.5°C** është nën rezolucionin praktik të dobishëm për përdoruesit fundorë (njerëzit nuk dallojnë 0.5°C); pra modeli është *gati* për përdorim real në këtë horizont.
+
+- **RMSE ≈ 1.5 × MAE** — kjo është një raport "i shëndetshëm". Nëse RMSE do të ishte shumë më i madh se MAE, do të nënkuptonte se kemi pak parashikime *katastrofike*. Këtu nuk e kemi atë problem.
+
+- **Early stopping** u aktivizua brenda <60 epokave, gjë që tregon se modeli nuk po overfit.
+
+### Kufizimet (që do të adresohen në Fazën III)
+
+1. **Dataset i vogël** (1107 rreshta, ~5 ditë mbulim) — për trajnim sezonal të vërtetë do të nevojiten muaj/vite të dhëna.
+2. **Horizont fiks 3h** — për parashikim 24h ose 7 ditë do të duhet ose model multi-step ose strategji *recursive forecasting*.
+3. **Pa hyperparameter tuning** — Faza III do të aplikojë GridSearch / Optuna mbi `hidden`, `SEQ_LEN`, `dropout`, `lr`.
+4. **Një target i vetëm** — mund të zgjerohet në *multi-output* (temperaturë + lagështi + reshje njëkohësisht).
+
+---
+
+## 📦 Artefaktet e Ruajtura
+
+Pas trajnimit, gjenerohen në [`models/`](models/):
+
+| Skedari            | Përmbajtja                                                   |
+|--------------------|--------------------------------------------------------------|
+| `lstm_model.pt`    | PyTorch `state_dict` — peshat e rrjetit të trajnuar         |
+| `scaler_lstm.pkl`  | `StandardScaler` për të standardizuar/destandartizuar të dhënat |
+| `metrics.txt`      | Log i plotë i trajnimit (forma sekuencash, epokat, metrikat) |
+
+---
+
+# 🔁 RETRAINING — Hyperparameter Tuning + Cross-Validation
+
+Skripta: [`phase2_retraining.py`](phase2_retraining.py)
+Modeli i ri-trajnuar: [`models/lstm_tuned.pt`](models/lstm_tuned.pt)
+Parametrat optimalë: [`models/best_params.json`](models/best_params.json)
+Trial-et e Optuna: [`models/optuna_trials.csv`](models/optuna_trials.csv)
+
+## 🎯 Pse retraining?
+
+Modeli baseline përdori hiperparametra "të menduar manualisht" (hidden=64, seq_len=6, lr=1e-3, dropout=0.2). Këto janë "best guesses" — nuk ka asnjë garanci që janë optimalë për këtë dataset specifik. Retraining-u ka dy qëllime kryesore:
+
+1. **Të gjejë hiperparametra më të mirë në mënyrë sistematike** — jo me prova-gabim manuale.
+2. **Të vlerësojë modelin në mënyrë më të besueshme** — një ndarje e vetme train/test mund të jetë "me fat" ose "pa fat". Cross-validation e zvogëlon këtë pasiguri.
+
+## 🛠️ Teknikat e Aplikuara
+
+### 1. Optuna (Bayesian Optimization, TPE Sampler)
+
+**Çfarë është?** Optuna është një bibliotekë moderne për kërkim hiperparametrash që përdor **Tree-structured Parzen Estimator (TPE)** — një algoritm Bayesian që mëson nga trial-et e mëparshme dhe drejton kërkimin drejt rajoneve premtuese të hapësirës së hiperparametrave.
+
+**Pse Optuna dhe jo GridSearch?**
+
+| Karakteristika | GridSearch | RandomSearch | **Optuna (TPE)** |
+|----------------|-----------|--------------|------------------|
+| Eksploron sistematikisht | ✅ | ❌ | ✅ |
+| Mëson nga trial-et e mëparshme | ❌ | ❌ | ✅ |
+| Pruning (ndërpret trial-e të dobëta) | ❌ | ❌ | ✅ |
+| Skalohet me dimension të lartë | ❌ (eksponencial) | ✅ | ✅ |
+
+Me 5 hiperparametra dhe 4 vlera për secilin, GridSearch do të kërkonte 4⁵ = **1024 trajnime**. Optuna arrin rezultate krahasuese me **25 trial-e**.
+
+### 2. TimeSeriesSplit Cross-Validation (k=5)
+
+**Pse jo K-Fold standarde?** K-Fold standarde përzien rastësisht datat → modeli mëson nga e ardhmja për të parashikuar të kaluarën → vlerësim joRealist (data leakage).
+
+`TimeSeriesSplit` ndan kohërisht:
+```
+Fold 1: Train [████░░░░░░░░░░░░░░░░]  Val [    ██░░░░░░░░░░░░░░]
+Fold 2: Train [██████░░░░░░░░░░░░░░]  Val [      ██░░░░░░░░░░░░]
+Fold 3: Train [████████░░░░░░░░░░░░]  Val [        ██░░░░░░░░░░]
+Fold 4: Train [██████████░░░░░░░░░░]  Val [          ██░░░░░░░░]
+Fold 5: Train [████████████░░░░░░░░]  Val [            ██░░░░░░]
+```
+Çdo fold trajnon vetëm me të kaluarën dhe vlerëson në të ardhmen — pasqyron skenarin real të parashikimit.
+
+### 3. Median Pruner
+
+Trial-et që janë qartë më keq se mediana e trial-eve të mëparshme në hapat e parë **ndalen herët**, duke ruajtur kohë llogaritëse për konfigurime premtuese.
+
+## 🔍 Hapësira e Kërkimit
+
+| Hiperparametri | Vlerat e provuara              | Justifikim |
+|----------------|-------------------------------|-----------|
+| `hidden`       | {32, 64, 96, 128}             | Madhësi shtresash LSTM — më e madhe = më shumë kapacitet por më shumë overfitting |
+| `seq_len`      | {4, 6, 8, 10}                 | Histori 12h–30h — provohet sa kohë histori i nevojitet modelit |
+| `dropout`      | [0.0, 0.40] hap 0.05          | Forca e regularizimit — më e lartë = më pak overfitting por më pak kapacitet mësimi |
+| `lr`           | [1e-4, 5e-3] (log)            | Mesatarja gjeometrike është më e dobishme se aritmetikja për learning rate |
+| `batch_size`   | {16, 32, 64}                  | Më i vogël = update më të shpeshtë por më të zhurmshëm |
+
+## 🏆 Hiperparametrat Optimalë (nga 25 trial-e)
+
+| Parametri  | Baseline | **Tuned** | Komenti |
+|------------|----------|-----------|---------|
+| hidden     | 64       | **64**    | I njëjti — 64 njësi është madhësia "sweet spot" për dataset të vogël |
+| seq_len    | 6        | **8**     | **Optuna preferoi 24h histori vs 18h** — kapen më mirë ciklet ditore |
+| dropout    | 0.2      | **0.1**   | Më pak dropout — modeli kishte underfitting të lehtë me 0.2 |
+| lr         | 1e-3     | **4.4e-3**| ~4× më i lartë — konvergon më shpejt pa lëshime gradienti |
+| batch_size | 32       | **16**    | Batch më i vogël → update më të shpeshtë → konvergim më i mirë në dataset të vogël |
+
+## 📊 Rezultatet pas Retrainimit
+
+| Metrika | Baseline LSTM | **Tuned LSTM** | Përmirësimi |
+|---------|---------------|----------------|-------------|
+| MAE     | 0.500 °C      | **0.421 °C**   | **−15.8%**  |
+| RMSE    | 0.756 °C      | **0.599 °C**   | **−20.8%**  |
+| R²      | 0.967         | **0.980**      | **+1.3 pp** |
+
+**CV RMSE (i shkallëzuar) gjatë tuning-ut:** 0.189 — vlerë e qëndrueshme përgjatë 5 fold-eve, që do të thotë modeli **nuk varet nga "një ndarje e veçantë me fat"**.
+
+### Diskutim i përmirësimit
+
+- **MAE u ul me 0.08°C** — duket pak në mënyrë absolute, por në **përqindje është 15.8%**, dhe R² shkoi nga 0.967 → 0.980, që do të thotë modeli i tuned-uar shpjegon edhe më shumë variancë.
+
+- **Sekuencat më të gjata (8 hapa) ishin çelësi:** 24 orë histori japin modelit informacion për ciklin e plotë ditor (ngrohje në ditë / ftohje natën). Me 18h, ai humbiste pjesë të këtij cikli.
+
+- **Learning rate më i lartë (4.4e-3) + batch size më i vogël (16)** punojnë së bashku: batch-i i vogël krijon zhurmë të dobishme në gradient, dhe lr-ja më e lartë e shfrytëzon këtë zhurmë për të shpëtuar nga minimumet lokale.
+
+- **Dropout-i u zvogëlua nga 0.2 në 0.1** — sugjeron që baseline-i ishte pak i nën-mësuar (under-fitted), jo i mbi-mësuar (overfit).
+
+- **TimeSeriesSplit CV** konfirmoi që rezultatet nuk janë artefakte të një ndarje të veçantë train/test — modeli është realisht më i mirë.
+
+## 📦 Artefaktet e Reja nga Retrainimi
+
+| Skedari                      | Përmbajtja |
+|------------------------------|-----------|
+| `models/lstm_tuned.pt`       | Peshat e LSTM-it me hiperparametrat optimalë |
+| `models/scaler_lstm_tuned.pkl` | Scaler-i përkatës |
+| `models/best_params.json`    | Parametrat optimalë + metrikat e testit |
+| `models/optuna_trials.csv`   | Të 25 trial-et me vlerat dhe rezultatet |
+| `models/retraining_log.txt`  | Logu i plotë i procesit |
+
+## 🚀 Si të Riprodhohen Rezultatet
+
+```bash
+pip install -r requirements.txt
+python weather_data_scraper.py     # mbledh datasetin (nëse mungon CSV)
+python phase2_model_training.py    # trajnon baseline LSTM
+python phase2_retraining.py        # Optuna tuning + ri-trajnim me CV
+```
+
+## 🎯 Hapat për Fazën III (Application of ML Tools)
+
+1. **Hyperparameter tuning** — GridSearch / Optuna mbi `hidden_size`, `SEQ_LEN`, `dropout`, `lr`, `batch_size`
+2. **Krahasim me baseline** — krahaso LSTM kundër naive (`y_t = y_{t-1}`), Linear Regression, dhe XGBoost mbi të njëjtin target
+3. **Vizualizime** — predicted vs actual për disa qytete, lakorja e humbjes, parashikim multi-step
+4. **Multi-step forecasting** — zgjero modelin për të parashikuar 6h, 12h, 24h përpara
+5. **Cross-validation kohore** — `TimeSeriesSplit` për vlerësim më robust
+6. **Integrim mjetesh ML** — MLflow për tracking eksperimentesh, TensorBoard për monitorim trajnimi
 

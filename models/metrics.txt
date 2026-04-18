@@ -1,0 +1,24 @@
+============================================================
+LOADING DATASET
+============================================================
+Rows: 1107  |  Columns: 20
+Cities: 27
+
+============================================================
+BUILDING SEQUENCES
+============================================================
+Total sequences: 918  |  Shape: (918, 6, 5)
+Train: 734  |  Test: 184
+
+============================================================
+LSTM  ->  next-step temperature (3h ahead)
+============================================================
+Architecture: LSTM(64) -> Dropout(0.2) -> Dense(32, ReLU) -> Dense(1)
+Optimizer: Adam(lr=1e-3)  |  Loss: MSE
+Epochs trained (early-stopped): 60
+Best validation loss: 0.0197
+
+Test metrics (Celsius):
+  MAE  = 0.500 C
+  RMSE = 0.756 C
+  R2   = 0.967
