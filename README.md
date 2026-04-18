@@ -58,7 +58,7 @@ A Machine Learning project that builds a complete, reproducible pipeline — fro
 | **Visualisation** | `matplotlib`, `seaborn` | Plots, heat-maps, feature-importance charts |
 | **Machine Learning** | `scikit-learn` | Random Forest, StandardScaler, train/test split, cross-validation, metrics |
 | **Serialisation** | `joblib` | Saving trained models + scalers |
-| **Data Source** | OpenWeatherMap API (via `requests`) | Live meteorological data (forecast + current) |
+| **Data Source** | Open-Meteo Archive API (via `requests`) | Historical hourly meteorological data (1-month window) |
 | **Version Control** | Git + GitHub | Source control, collaboration |
 | **OS / Platform** | Windows 11, bash shell | Development environment |
 
@@ -69,7 +69,7 @@ A Machine Learning project that builds a complete, reproducible pipeline — fro
 ### Prerequisites
 - Python ≥ 3.10
 - Git
-- A free [OpenWeatherMap](https://openweathermap.org/api) API key (only required if you want to re-collect the dataset)
+- An internet connection (the [Open-Meteo Archive API](https://open-meteo.com/en/docs/historical-weather-api) is free and **does not require an API key**)
 
 ### Step-by-step
 
@@ -87,7 +87,7 @@ source .venv/bin/activate         # Linux / macOS / Git-Bash on Windows
 # 3. Install dependencies
 pip install pandas numpy matplotlib seaborn scikit-learn joblib requests
 
-# 4. Re-collect data from OpenWeatherMap
+# 4. Re-collect data from Open-Meteo (no API key required)
 
 python weather_data_scraper.py
 
@@ -115,20 +115,22 @@ reports/
 
 | Property | Value |
 |----------|-------|
-| **Source** | [OpenWeatherMap API](https://openweathermap.org/api) — public, free tier |
+| **Source** | [Open-Meteo Archive API](https://open-meteo.com/en/docs/historical-weather-api) — public, free, no API key required |
 | **Geographic scope** | 27 municipalities of the Republic of Kosovo |
-| **Instances (rows)** | **1107** |
-| **Attributes (columns)** | **20** |
-| **File size** | ≈ 142 KB (CSV) |
-| **Temporal resolution** | every 3 hours |
-| **Temporal coverage** | ~5-day forecast horizon + one live snapshot per city |
+| **Instances (rows)** | **20,736** |
+| **Attributes (columns)** | **14** |
+| **File size** | ≈ 1.5 MB (CSV) |
+| **Temporal resolution** | every 1 hour |
+| **Temporal coverage** | ~31 days of historical hourly observations (rolling window ending on the last run) |
 | **File format** | CSV (UTF-8, `pandas`-compatible) |
 | **Collection script** | [`weather_data_scraper.py`](weather_data_scraper.py) |
 | **Raw data file** | [`kosovo_weather_dataset.csv`](kosovo_weather_dataset.csv) |
 
-### Attributes (20)
+### Attributes (14)
 
-`city`, `type`, `datetime`, `temperature`, `feels_like`, `temp_min`, `temp_max`, `pressure`, `humidity`, `weather`, `description`, `wind_speed`, `wind_deg`, `wind_gust`, `clouds`, `visibility`, `pop`, `hour`, `day`, `month`.
+`datetime`, `temperature_2m`, `relative_humidity_2m`, `apparent_temperature`, `precipitation`, `surface_pressure`, `cloud_cover`, `wind_speed_10m`, `wind_direction_10m`, `city`, `hour`, `day`, `month`, `year`.
+
+> During Phase II the meteorological columns are renamed to shorter canonical names used by the model pipeline: `temperature_2m` → `temperature`, `relative_humidity_2m` → `humidity`, `surface_pressure` → `pressure`, `wind_speed_10m` → `wind_speed`, `wind_direction_10m` → `wind_deg`, `cloud_cover` → `clouds`, `precipitation` → `pop`.
 
 ---
 
@@ -138,12 +140,12 @@ reports/
 Accurate short-term temperature forecasts are essential for agriculture planning, energy demand prediction, public-health advisories, and daily citizen decisions. Commercial weather services provide generic forecasts, but **small, region-specific models tuned on local data** often capture micro-climatic behaviour (e.g. the urban-heat-island effect in Pristina, or the cooler mountain valleys around Dragash) more faithfully than global models.
 
 ### The idea
-Build a **supervised Machine-Learning pipeline** that ingests real meteorological data from the [OpenWeatherMap API](https://openweathermap.org/api) for all 27 municipalities of Kosovo and learns to **predict the air temperature** (°C) from other observable variables — humidity, pressure, wind speed, cloud coverage, precipitation probability, and the time of day.
+Build a **supervised Machine-Learning pipeline** that ingests real meteorological data from the [Open-Meteo Archive API](https://open-meteo.com/en/docs/historical-weather-api) for all 27 municipalities of Kosovo and learns to **predict the air temperature** (°C) from other observable variables — humidity, pressure, wind speed, cloud coverage, precipitation, and the time of day.
 
 ### The approach
 | Step | Action |
 |------|--------|
-| 1. Data collection | Scrape 5-day, 3-hour-interval forecasts + live snapshots for all 27 cities |
+| 1. Data collection | Fetch ~31 days of hourly historical observations for all 27 cities |
 | 2. Model preparation (Phase I) | Clean, explore, engineer cyclic time features, define the ML task |
 | 3. Model training (Phase II) | Train a **Random Forest Regressor** — a supervised, non-linear regression algorithm |
 | 4. Analysis and re-training (Phase III) | Evaluate, tune hyperparameters, improve generalisation |
@@ -157,83 +159,74 @@ Phase I lays the foundation of the whole project: **collecting, structuring, and
 
 ## Tasks Performed
 
-1. **Identification of the data source** — [OpenWeatherMap API](https://openweathermap.org/api) was chosen as a trusted, publicly accessible source for global meteorological forecasts.
+1. **Identification of the data source** — the [Open-Meteo Archive API](https://open-meteo.com/en/docs/historical-weather-api) was chosen as a trusted, free, key-less source for global historical hourly meteorological data.
 2. **Selection of 27 municipalities of Kosovo** with their (lat, lon) coordinates to cover all regions.
 3. **Development of the script [`weather_data_scraper.py`](weather_data_scraper.py)** which, for each city:
-   - fetches the 5-day forecast at a 3-hour interval (`forecast` endpoint),
-   - fetches the current weather snapshot (`weather` endpoint).
-4. **Persistence to CSV** as [`kosovo_weather_dataset.csv`](kosovo_weather_dataset.csv), automatically appending the columns `hour`, `day`, and `month` for temporal analysis.
-5. **Integrity verification** (no duplicates, no empty rows in the primary target columns).
+   - queries the `archive-api.open-meteo.com/v1/archive` endpoint for the last ~31 days,
+   - requests hourly `temperature_2m`, `relative_humidity_2m`, `apparent_temperature`, `precipitation`, `surface_pressure`, `cloud_cover`, `wind_speed_10m`, `wind_direction_10m` (timezone `Europe/Belgrade`).
+4. **Persistence to CSV** as [`kosovo_weather_dataset.csv`](kosovo_weather_dataset.csv), automatically appending the columns `hour`, `day`, `month`, and `year` for temporal analysis.
+5. **Integrity verification** (no duplicates, no empty rows in the primary target columns — the dataset ships with **zero NaN** across all 14 columns).
 
 ## Defined Machine-Learning Tasks
 
-The dataset built in this phase is designed to support three main ML tasks across the later phases:
+The dataset built in this phase is designed to support two main ML tasks across the later phases:
 
 | # | Task | Type | Target (output) | Main input features |
 |---|------|------|-----------------|---------------------|
-| 1 | Temperature forecasting | **Regression (supervised)** | `temperature` (°C, numeric) | humidity, pressure, clouds, wind_speed |
-| 2 | Weather-state classification | Classification (supervised) | `weather` (Clear / Clouds / Rain / Snow) | temperature, humidity, clouds, pop |
-| 3 | Sequential time-series forecasting | Time-series (future work) | `temperature[t+1]` | 6-step × 5-feature sequence |
+| 1 | Temperature forecasting | **Regression (supervised)** | `temperature` (°C, numeric) | humidity, pressure, clouds, wind_speed, cyclic time |
+| 2 | Sequential time-series forecasting | Time-series (future work) | `temperature[t+1]` | lagged multi-hour windows per city |
+
+> Note: the previous "weather-state classification" task depended on a categorical `weather` column produced by OpenWeatherMap. Open-Meteo's archive endpoint does not return that field, so that task has been dropped in favour of a single well-defined regression problem.
 
 ## Attribute Types
 
-Out of 20 total columns, the structural split is:
+Out of 14 total columns, the structural split is:
 
 | Type | Count | Attributes |
 |------|-------|-----------|
-| **Numeric (continuous)** | 10 | `temperature`, `feels_like`, `temp_min`, `temp_max`, `pressure`, `humidity`, `wind_speed`, `wind_gust`, `visibility`, `pop` |
-| **Numeric (discrete / temporal)** | 5 | `wind_deg`, `clouds`, `hour`, `day`, `month` |
-| **Categorical** | 3 | `city` (27 levels), `type` (2 levels), `weather` (4 levels) |
-| **Textual** | 1 | `description` (free-text, not used for training) |
-| **Datetime** | 1 | `datetime` (ISO 8601) |
+| **Numeric (continuous)** | 7 | `temperature_2m`, `apparent_temperature`, `relative_humidity_2m`, `surface_pressure`, `wind_speed_10m`, `cloud_cover`, `precipitation` |
+| **Numeric (discrete / temporal)** | 5 | `wind_direction_10m`, `hour`, `day`, `month`, `year` |
+| **Categorical** | 1 | `city` (27 levels) |
+| **Datetime** | 1 | `datetime` (ISO 8601, hourly) |
 
 ## Descriptive Statistics (numeric attributes)
 
 | Attribute | min | mean | std | max |
 |-----------|-----|------|-----|-----|
-| `temperature` (°C) | −1.99 | 9.47 | 4.52 | 20.00 |
-| `feels_like` (°C) | −4.27 | 8.27 | 4.74 | 19.05 |
-| `humidity` (%) | 29 | 68.06 | 17.01 | 100 |
-| `pressure` (hPa) | 1011 | 1015.98 | 1.91 | 1021 |
-| `wind_speed` (m/s) | 0.08 | 2.33 | 1.58 | 10.29 |
-| `clouds` (%) | 0 | 60.72 | 36.61 | 100 |
-| `visibility` (m) | 0 | 9717 | 1394 | 10000 |
-| `pop` (prob.) | 0.00 | 0.15 | 0.31 | 1.00 |
+| `temperature_2m` (°C) | −2.30 | 8.82 | 4.93 | 23.70 |
+| `apparent_temperature` (°C) | −6.30 | 5.93 | 5.35 | 22.20 |
+| `relative_humidity_2m` (%) | 18 | 66.50 | 19.22 | 100 |
+| `surface_pressure` (hPa) | 875.90 | 949.63 | 17.11 | 981.30 |
+| `wind_speed_10m` (km/h) | 0.00 | 8.91 | 5.73 | 30.10 |
+| `wind_direction_10m` (°) | 0 | 151.04 | 126.84 | 360 |
+| `cloud_cover` (%) | 0 | 64.49 | 39.58 | 100 |
+| `precipitation` (mm) | 0.00 | 0.06 | 0.28 | 5.50 |
 
-### Class distribution for the categorical target `weather`
-
-| Class | Count | Share |
-|-------|-------|-------|
-| Clouds | 686 | 61.97 % |
-| Rain   | 242 | 21.86 % |
-| Clear  | 170 | 15.36 % |
-| Snow   | 9   | 0.81 %|
-
-A clear **class imbalance** is observed (the `Snow` class is heavily under-represented) — a limitation that will be addressed in Phase III using oversampling techniques.
+> `surface_pressure` is reported at station altitude (not sea-level adjusted), which is why the mean sits below the standard 1013 hPa — many Kosovo stations sit hundreds of metres above sea level.
 
 ## Missing Values
 
-| Column | Missing | Reason | Treatment |
-|--------|---------|--------|-----------|
-| `pop` | 27 | API does not return `pop` for `type = current` rows | Imputed with `0.0` in Phase II |
-| all others | **0** | — | — |
+| Column | Missing | Treatment |
+|--------|---------|-----------|
+| all 14 columns | **0** | none required |
 
-**Total NaN in the dataset: 27 / (1107 × 20 = 22,140 cells) → 0.12 %** — very high data quality.
+**Total NaN in the dataset: 0 / (20,736 × 14 = 290,304 cells) → 0.00 %** — the Open-Meteo archive returns fully-populated hourly records.
 
 ## Why these attributes?
 
-- **Core meteorological variables** (`temperature`, `humidity`, `pressure`, `wind_*`, `clouds`) — standard physical inputs for atmospheric modelling.
-- **`pop` and `visibility`** — precipitation / visibility indicators, useful for weather classification.
-- **`hour`, `day`, `month`** — automatically derived to capture **temporal cycles** (diurnal / seasonal).
+- **Core meteorological variables** (`temperature_2m`, `relative_humidity_2m`, `surface_pressure`, `wind_speed_10m`, `wind_direction_10m`, `cloud_cover`) — standard physical inputs for atmospheric modelling.
+- **`apparent_temperature`** — "feels-like" temperature, useful as a sanity reference and for later multi-target experiments.
+- **`precipitation`** (mm in the last hour) — ground-truth rainfall; replaces the probabilistic `pop` field from the old OpenWeatherMap pipeline and is renamed to `pop` inside the training script for pipeline compatibility.
+- **`hour`, `day`, `month`, `year`** — automatically derived to capture **temporal cycles** (diurnal / seasonal); `hour` and `month` are later encoded cyclically with `sin / cos`.
 - **`city`** — enables per-city modelling or regional climate grouping.
 - **lat / lon coordinates** are not stored in the CSV because they are static per city and can be re-joined from `weather_data_scraper.py`.
 
 ## Phase I Outcome
 
 A complete, clean, and well-structured foundation for Kosovo weather modelling:
-- **1107 instances × 20 attributes**, only **0.12 % NaN** (easily handled),
-- **3 ML tasks clearly defined** (regression, classification, time-series),
-- descriptive statistics and class distribution fully documented,
+- **20,736 instances × 14 attributes**, with **0 % NaN** (no imputation required),
+- **2 ML tasks clearly defined** (regression now, time-series as future work),
+- descriptive statistics fully documented for all numeric attributes,
 - a supervised regression algorithm selected and justified,
 - ready to be trained in Phase II without requiring further major cleaning.
 
@@ -246,12 +239,11 @@ A complete, clean, and well-structured foundation for Kosovo weather modelling:
 | Parameter | Actual Value |
 |-----------|--------------|
 | Number of cities | 27 |
-| Forecasts per city | 40 |
-| Current snapshots per city | 1 |
-| Total rows per run | ~1107 |
-| Number of columns | 20 |
-| Temporal resolution | 3 hours |
-| Coverage horizon | 5 days |
+| Hourly observations per city | 768 |
+| Total rows per run | 20,736 |
+| Number of columns | 14 |
+| Temporal resolution | 1 hour |
+| Coverage horizon | ~31 days (rolling) |
 
 ### Cities Analysed (sample)
 
@@ -265,33 +257,34 @@ A complete, clean, and well-structured foundation for Kosovo weather modelling:
 | Ferizaj | Ferizaj |
 | Gjilan | Gjilan |
 
-### Real Statistics Extracted from the Dataset (sample)
+### Real Statistics Extracted from the Dataset (aggregate)
 
-| City | Min Temp (°C) | Max Temp (°C) | Humidity (%) | Weather |
-|------|---------------|---------------|--------------|---------|
-| Pristina | 5.60 | 13.58 | 44 – 90 | Clouds / Clear |
-| Prizren  | ~6.00 | ~15.00 | 40 – 85 | Clear / Clouds |
-| Peja     | ~5.00 | ~14.00 | 50 – 88 | Clouds |
-| Gjakova  | ~6.50 | ~15.50 | 45 – 80 | Clear |
-| Mitrovica | ~5.50 | ~13.00 | 50 – 85 | Clouds |
+| Metric | Value |
+|--------|-------|
+| Overall temperature range | −2.30 °C  →  23.70 °C |
+| Overall mean temperature | 8.82 °C |
+| Overall humidity range | 18 % → 100 % |
+| Overall mean humidity | 66.5 % |
+| Hourly rows per city | 768 (31 days × 24 h + boundary hours) |
+| Cities with identical coverage | 27 / 27 |
 
 ### Temporal Structure
 
-| Date | Intervals |
-|------|-----------|
-| 2026-03-23 | every 3 hours |
-| 2026-03-24 | every 3 hours |
-| 2026-03-25 | every 3 hours |
-| 2026-03-26 | every 3 hours |
-| 2026-03-27 | every 3 hours |
+| Property | Value |
+|----------|-------|
+| Start of window | 2026-03-18 00:00 |
+| End of window | 2026-04-18 23:00 |
+| Interval | every 1 hour |
+| Distinct timestamps | 768 |
+| Days covered | 32 |
 
 ### Sample Raw Records
 
-| City | Type | Datetime | Temp (°C) | Humidity (%) | Weather |
-|------|------|----------|-----------|--------------|---------|
-| Pristina | forecast | 2026-03-23 19:00 | 9.65 | 60 | Clouds |
-| Pristina | forecast | 2026-03-24 01:00 | 5.60 | 90 | Clouds |
-| Pristina | forecast | 2026-03-25 13:00 | 13.58 | 44 | Clear |
+| City | Datetime | Temp (°C) | Humidity (%) | Pressure (hPa) |
+|------|----------|-----------|--------------|----------------|
+| Pristina | 2026-03-18 00:00 | 4.2 | 94 | 942.5 |
+| Pristina | 2026-03-18 13:00 | 11.8 | 52 | 944.1 |
+| Prizren  | 2026-04-01 06:00 | 6.5 | 81 | 963.2 |
 
 ### Temperature Analysis
 
@@ -306,25 +299,26 @@ A complete, clean, and well-structured foundation for Kosovo weather modelling:
 
 | Parameter | Range |
 |-----------|-------|
-| Wind Speed | 0.5 – 6 m/s |
-| Pressure | 1010 – 1018 hPa |
-| Wind Direction | 0° – 360° |
+| Wind Speed | 0.0 – 30.1 km/h (mean 8.9) |
+| Surface Pressure | 875.9 – 981.3 hPa (mean 949.6, station-altitude) |
+| Wind Direction | 0° – 360° (mean 151°) |
 
 ### Humidity Analysis
 
 | Parameter | Value |
 |-----------|-------|
-| Minimum humidity | ~40 % |
-| Maximum humidity | ~90 % |
-| Mean | ~65 % |
+| Minimum humidity | 18 % |
+| Maximum humidity | 100 % |
+| Mean | 66.5 % |
 
-### Probability of Precipitation
+### Precipitation (mm / hour)
 
 | Parameter | Value |
 |-----------|-------|
-| POP min | 0.0 |
-| POP max | 1.0 |
-| Mean | ~0.3 |
+| Min | 0.0 mm |
+| Max | 5.5 mm |
+| Mean | 0.06 mm |
+| Dry hours (= 0 mm) | majority of the window |
 
 ---
 
@@ -383,24 +377,25 @@ Three visualisations are produced during training:
 
 ## Data Preprocessing
 
-1. **Drop rows with missing values** in `temperature`, `humidity`, `pressure` (the primary features).
-2. **Fill `pop`** with `0.0` for `type = current` rows (where the API does not return this field).
-3. **Cyclic encoding of time** using `sin / cos` for `hour` and `month`:
+1. **Rename Open-Meteo columns** to the canonical model names (`temperature_2m` → `temperature`, `relative_humidity_2m` → `humidity`, `surface_pressure` → `pressure`, `wind_speed_10m` → `wind_speed`, `wind_direction_10m` → `wind_deg`, `cloud_cover` → `clouds`, `precipitation` → `pop`).
+2. **Drop rows with missing values** in `temperature`, `humidity`, `pressure` (defensive; the current dataset has none).
+3. **Fill `pop`** with `0.0` as a safety net (no-ops on the current CSV where every hour already has a precipitation value).
+4. **Cyclic encoding of time** using `sin / cos` for `hour` and `month`:
    - Reason: `23:00` and `00:00` are adjacent in time but appear numerically far apart. `sin / cos` preserves the cyclic adjacency.
-4. **80 / 20 train / test split** with `random_state = 42` for reproducibility.
-5. **`StandardScaler`** is fitted on the training set and saved for future pipeline compatibility; Random Forest itself does not require scaling.
+5. **80 / 20 train / test split** with `random_state = 42` for reproducibility.
+6. **`StandardScaler`** is fitted on the training set and saved for future pipeline compatibility; Random Forest itself does not require scaling.
 
 ### Split sizes
 
 | Split | Row count | Share |
 |-------|-----------|-------|
-| **Train** | **885** | 80 % |
-| **Test**  | **222** | 20 % |
-| **Total** | 1107 | 100 % |
+| **Train** | **16,588** | 80 % |
+| **Test**  | **4,148**  | 20 % |
+| **Total** | 20,736 | 100 % |
 
-### Input features (11)
+### Input features (10)
 
-`humidity, pressure, wind_speed, wind_deg, clouds, visibility, pop, hour_sin, hour_cos, month_sin, month_cos`
+`humidity, pressure, wind_speed, wind_deg, clouds, pop, hour_sin, hour_cos, month_sin, month_cos`
 
 **Target:** `temperature` (°C, numeric).
 
@@ -408,14 +403,13 @@ Three visualisations are produced during training:
 
 ![Correlation Heatmap](reports/phase2_correlation_heatmap.png)
 
-| Feature | |corr| with `temperature` |
-|---------|---------------------------|
-| `humidity`   | **0.758** (strongest) |
-| `pressure`   | 0.406 |
-| `wind_speed` | 0.371 |
-| `clouds`     | 0.199 |
-| `visibility` | 0.173 |
-| `pop`        | 0.147 |
+| Feature | \|corr\| with `temperature` |
+|---------|-----------------------------|
+| `humidity`   | **0.684** (strongest) |
+| `pressure`   | 0.318 |
+| `wind_speed` | 0.161 |
+| `clouds`     | 0.138 |
+| `pop`        | 0.133 |
 
 Humidity is the strongest predictor — a physically expected result, since warmer air typically holds less relative humidity.
 
@@ -435,10 +429,10 @@ The baseline configuration is a deliberately *simple* Random Forest — reasonab
 
 | Metric | Value |
 |--------|-------|
-| MAE (test)  | **1.029 °C** |
-| RMSE (test) | **1.519 °C** |
-| R² (train)  | 0.9828 |
-| R² (test)   | **0.8831** |
+| MAE (test)  | **1.082 °C** |
+| RMSE (test) | **1.564 °C** |
+| R² (train)  | 0.9857 |
+| R² (test)   | **0.9003** |
 
 ### Predicted vs. Actual
 
@@ -452,35 +446,100 @@ The points cluster tightly along the ideal diagonal (dashed line) — the model 
 
 | Feature | Importance |
 |---------|-----------|
-| `humidity`   | **0.670** |
-| `pressure`   | 0.127 |
-| `clouds`     | 0.059 |
-| `wind_speed` | 0.043 |
-| `hour_sin`   | 0.043 |
-| `wind_deg`   | 0.032 |
-| `hour_cos`   | 0.015 |
-| `pop`        | 0.009 |
-| `visibility` | 0.001 |
-| `month_sin`  | ~0.000 |
-| `month_cos`  | ~0.000 |
+| `humidity`   | **0.474** |
+| `month_cos`  | 0.097 |
+| `month_sin`  | 0.095 |
+| `pressure`   | 0.069 |
+| `hour_cos`   | 0.062 |
+| `hour_sin`   | 0.057 |
+| `wind_deg`   | 0.050 |
+| `clouds`     | 0.050 |
+| `wind_speed` | 0.041 |
+| `pop`        | 0.005 |
 
- Humidity dominates the temperature prediction, followed by pressure and clouds — results consistent with atmospheric physics. `month_*` are effectively zero because the dataset spans only ~5 days.
+ Humidity dominates the temperature prediction, followed by the seasonal (`month_*`) and diurnal (`hour_*`) cyclic features — a physically sensible ranking for a 31-day, hourly dataset that straddles a seasonal transition. `pop` is near-zero because precipitation rarely drives temperature on an hour-by-hour basis.
 
 ## Phase II Conclusions
 
 1. **A single supervised algorithm — Random Forest Regressor — was successfully trained**.
-2. The **train / test split (885 / 222)** is explicit and reproducible.
-3. The trained model achieves **MAE = 1.03 °C** and **R² (test) = 0.88** on held-out data.
-4. The **feature-importance ranking is physically interpretable**, confirming the model learned meaningful signal.
+2. The **train / test split (16,588 / 4,148)** is explicit and reproducible.
+3. The trained model achieves **MAE = 1.08 °C** and **R² (test) = 0.90** on held-out data.
+4. The **feature-importance ranking is physically interpretable**, confirming the model learned meaningful signal (humidity + seasonal/diurnal cycles dominate).
 5. All artifacts (trained model, scaler, training log, plots) are serialised in [`models/`](models/) and [`reports/`](reports/), ready for the next phase.
 
 ---
 
 # PHASE III — Analysis and Evaluation (planned)
 
-Phase III is **not yet executed**. It will focus on:
+Phase III is **not yet executed**. It is structured as a sequence of three work-streams: **(A) rigorous evaluation** of the Phase II baseline, **(B) feature engineering + hyperparameter re-training**, and **(C) quantitative comparison** against both the Phase II model and simple reference baselines.
 
-- **In-depth evaluation** of the trained model: 5-fold / k-fold cross-validation, train-vs-test gap analysis, error distribution per class / city, residual diagnostics.
-- **Re-training** with improved configurations — systematic hyperparameter search (e.g., GridSearchCV / RandomizedSearchCV), anti-overfitting adjustments (`min_samples_leaf`, `max_features`), and feature engineering (lag features, per-city encodings).
-- **Comparison against the Phase II baseline**, quantifying the concrete improvement contributed by the re-training step.
-- **Conclusions and outlook** — interpretation of results, who benefits, and potential future work.
+## A. In-Depth Evaluation of the Phase II Baseline
+
+| # | Task | Detail |
+|---|------|--------|
+| 1 | **K-Fold Cross-Validation** | 5-fold CV on the full 20,736 rows — report mean ± std of MAE, RMSE, R². |
+| 2 | **Time-based (chronological) split** | Train on the first ~25 days, hold out the last ~6 days. Measures true forecasting skill (a random split leaks information from the future). |
+| 3 | **Train-vs-test gap analysis** | Current gap: R²_train = 0.986 vs R²_test = 0.900 (Δ = 0.086). Diagnose whether this is noise ceiling or overfitting. |
+| 4 | **Residual diagnostics** | Histogram of residuals, Q–Q plot, residuals vs predicted. |
+| 5 | **Error breakdown** by dimension: | Mean / median absolute error grouped by **hour of day**, **month / day-of-week**, **city (27 levels)**, **temperature quartile** (cold / mild / warm / hot). |
+| 6 | **Learning curves** | Error vs training-set size — has the model plateaued, or would more data still help? |
+| 7 | **Permutation importance** | More trustworthy than the impurity-based feature importance reported in Phase II (the latter is biased toward high-cardinality features). |
+
+## B. Feature Engineering & Re-training
+
+### B.1 Feature engineering candidates
+
+| Feature family | Examples | Motivation |
+|----------------|----------|-----------|
+| **Lag features** | `temp_lag_1h`, `temp_lag_3h`, `temp_lag_24h`, `humidity_lag_1h` | Temperature at `t` is highly autocorrelated with recent hours — expected to cut MAE sharply. |
+| **Rolling statistics** | 3-h / 24-h rolling mean & std for `temperature`, `humidity`, `pressure` | Captures local trend and volatility. |
+| **Delta features** | `pressure_delta_3h`, `humidity_delta_3h` | Pressure changes often precede temperature changes. |
+| **City encoding** | One-hot (27 dummies) **or** target encoding of `city` | The current model has no notion of location — Pristina and Dragash look identical to it. |
+| **Interaction features** | `humidity × clouds`, `wind_speed × pressure_delta` | Let trees exploit known physical couplings. |
+
+### B.2 Hyperparameter search grid
+
+GridSearchCV or RandomizedSearchCV with **5-fold CV** over the following space:
+
+| Hyperparameter | Candidate values |
+|----------------|------------------|
+| `n_estimators` | 100, 300, 500 |
+| `max_depth` | `None`, 10, 20, 30 |
+| `min_samples_leaf` | 1, 2, 5, 10 |
+| `min_samples_split` | 2, 5, 10 |
+| `max_features` | `sqrt`, `log2`, 0.5 |
+
+Scoring: **negative MAE** (primary) and **R²** (secondary). The combination with the best CV MAE that also keeps the train-test gap < 0.05 R² is the winning configuration.
+
+## C. Comparison Protocol
+
+### C.1 Reference baselines
+
+Every Phase III model is compared not only to the Phase II Random Forest but also to three trivial baselines — this proves the Random Forest is learning real signal, not just memorising obvious patterns:
+
+| Baseline | Definition |
+|----------|------------|
+| **Global mean** | Predict the overall mean temperature for every row. |
+| **Per-city mean** | Predict the mean temperature of the corresponding city. |
+| **Persistence** | Predict `temp[t] = temp[t−1h]` — the naive "tomorrow is like today" forecaster. |
+| **Linear Regression** | Same features as Random Forest, fitted with OLS — tests whether a non-linear model is really needed. |
+
+### C.2 Final comparison table (to be filled in)
+
+| Model | MAE (°C) | RMSE (°C) | R² (test) | Train-test gap | Notes |
+|-------|---------:|----------:|----------:|---------------:|-------|
+| Global mean        | TBD | TBD | TBD | — | sanity floor |
+| Per-city mean      | TBD | TBD | TBD | — | sanity floor |
+| Persistence (1 h)  | TBD | TBD | TBD | — | sanity floor |
+| Linear Regression  | TBD | TBD | TBD | TBD | linearity check |
+| **RF — Phase II baseline** | **1.08** | **1.56** | **0.900** | **0.086** | reference |
+| RF — tuned (B.2)   | TBD | TBD | TBD | TBD | hyperparameter tuning only |
+| RF — tuned + lag features | TBD | TBD | TBD | TBD | + B.1 lag family |
+| **RF — final (tuned + all features)** | **TBD** | **TBD** | **TBD** | **TBD** | Phase III winner |
+
+## D. Deliverables & Outlook
+
+- `phase3_evaluation.py` — runs A.1–A.7 on the Phase II model and saves plots to `reports/`.
+- `phase3_retraining.py` — runs B.1–B.2 and saves the final model to `models/rf_model_v2.pkl`.
+- `reports/phase3_evaluation_summary.json` — all metrics in machine-readable form.
+- Updated README section with the populated Table C.2 and an interpretation of *who benefits* from the improvement (agriculture, energy demand, public-health advisories).
