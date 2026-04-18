@@ -69,7 +69,6 @@ plt.close()
 log("\nStrongest absolute correlations with temperature:")
 log(corr["temperature"].drop("temperature").abs().sort_values(ascending=False).to_string())
 
-
 X = df[FEATURES].values
 y = df[TARGET].values
 
@@ -108,9 +107,7 @@ log(f"  RMSE        : {rmse:.3f} C")
 log(f"  R^2 (train) : {r2_tr:.4f}")
 log(f"  R^2 (test)  : {r2_te:.4f}")
 
-
 joblib.dump(model, os.path.join(MODELS_DIR, "rf_model.pkl"))
-
 
 imp = pd.Series(model.feature_importances_, index=FEATURES).sort_values()
 plt.figure(figsize=(7, 5))
