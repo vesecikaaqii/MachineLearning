@@ -26,11 +26,9 @@ os.makedirs(REPORTS_DIR, exist_ok=True)
 
 log_lines = []
 
-
 def log(msg=""):
     print(msg)
     log_lines.append(str(msg))
-
 
 log("=" * 70)
 log("PHASE II  -  Model Training  (Random Forest Regressor)")
@@ -56,7 +54,6 @@ TARGET = "temperature"
 log(f"Rows after cleaning : {len(df)}")
 log(f"Features (11)       : {FEATURES}")
 log(f"Target              : {TARGET} (deg C)")
-
 
 corr_cols = ["temperature", "humidity", "pressure", "wind_speed",
              "clouds", "visibility", "pop"]
