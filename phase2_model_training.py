@@ -32,9 +32,6 @@ def log(msg=""):
     log_lines.append(str(msg))
 
 
-# ---------------------------------------------------------------------------
-# 1. LOAD & PREPROCESS
-# ---------------------------------------------------------------------------
 log("=" * 70)
 log("PHASE II  -  Model Training  (Random Forest Regressor)")
 log("=" * 70)
@@ -61,9 +58,6 @@ log(f"Features (11)       : {FEATURES}")
 log(f"Target              : {TARGET} (deg C)")
 
 
-# ---------------------------------------------------------------------------
-# 2. EDA  -
-# ---------------------------------------------------------------------------
 corr_cols = ["temperature", "humidity", "pressure", "wind_speed",
              "clouds", "visibility", "pop"]
 corr = df[corr_cols].corr()
@@ -79,9 +73,6 @@ log("\nStrongest absolute correlations with temperature:")
 log(corr["temperature"].drop("temperature").abs().sort_values(ascending=False).to_string())
 
 
-# ---------------------------------------------------------------------------
-# 3. TRAIN / TEST SPLIT
-# ---------------------------------------------------------------------------
 X = df[FEATURES].values
 y = df[TARGET].values
 
@@ -95,9 +86,6 @@ joblib.dump(scaler, os.path.join(MODELS_DIR, "scaler_phase2.pkl"))
 log(f"\nTrain / Test split  : {len(X_train)} / {len(X_test)}  (80% / 20%)")
 
 
-# ---------------------------------------------------------------------------
-# 4. TRAIN THE MODEL   
-# ---------------------------------------------------------------------------
 cfg = dict(n_estimators=100, max_depth=None, min_samples_leaf=1,
            random_state=42, n_jobs=-1)
 
@@ -124,9 +112,6 @@ log(f"  R^2 (train) : {r2_tr:.4f}")
 log(f"  R^2 (test)  : {r2_te:.4f}")
 
 
-# ---------------------------------------------------------------------------
-# 5. SAVE MODEL + VISUALISATIONS
-# ---------------------------------------------------------------------------
 joblib.dump(model, os.path.join(MODELS_DIR, "rf_model.pkl"))
 
 
