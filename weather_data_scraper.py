@@ -33,10 +33,11 @@ def get_resilient_session():
     return session
 
 def fetch_historical_weather():
-    # Set timeframe to exactly 31 days (Yields ~20,088 rows)
-    end_date = datetime.now().date()
-    start_date = end_date - timedelta(days=31) 
-    
+    # Open-Meteo Archive (ERA5) lags ~1 day behind real time, so we shift the
+    # end date back by 2 days to stay safely inside the allowed range.
+    end_date = datetime.now().date() - timedelta(days=2)
+    start_date = end_date - timedelta(days=31)
+
     archive_url = "https://archive-api.open-meteo.com/v1/archive"
     session = get_resilient_session()
     all_city_dataframes = []

@@ -29,15 +29,15 @@ A Machine Learning project that builds a complete, reproducible pipeline — fro
 
 ## Table of Contents
 
-1. [Project Goals](#-1-project-goals)
-2. [Technologies Used](#-2-technologies-used)
-3. [Installation and Setup](#-3-installation-and-setup)
-4. [Dataset Description](#-4-dataset-description)
-5. [PHASE I — Model Preparation](#-phase-i--model-preparation)
-6. [Dataset Overview and Exploratory Insights](#-dataset-overview-and-exploratory-insights)
-7. [Selected Algorithm](#-selected-algorithm)
-8. [PHASE II — Model Training](#-phase-ii--model-training)
-9. [PHASE III — Analysis and Evaluation (planned)](#-phase-iii--analysis-and-evaluation-planned)
+1. [Technologies Used](#technologies-used)
+2. [Installation and Setup](#installation-and-setup)
+3. [Dataset Description](#dataset-description)
+4. [About the Project](#about-the-project)
+5. [PHASE I — Model Preparation](#phase-i--model-preparation)
+6. [Dataset Overview and Exploratory Insights](#dataset-overview-and-exploratory-insights)
+7. [Selected Algorithm](#selected-algorithm)
+8. [PHASE II — Model Training](#phase-ii--model-training)
+9. [PHASE III — Analysis and Evaluation (planned)](#phase-iii--analysis-and-evaluation-planned)
 
 ### Project Phases (per course structure)
 
@@ -49,7 +49,7 @@ A Machine Learning project that builds a complete, reproducible pipeline — fro
 
 ---
 
-## 2. Technologies Used
+## Technologies Used
 
 | Category | Tool / Library | Purpose |
 |----------|----------------|---------|
@@ -64,7 +64,7 @@ A Machine Learning project that builds a complete, reproducible pipeline — fro
 
 ---
 
-## 3. Installation and Setup
+## Installation and Setup
 
 ### Prerequisites
 - Python ≥ 3.10
@@ -75,7 +75,7 @@ A Machine Learning project that builds a complete, reproducible pipeline — fro
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/<user>/MachineLearning.git
+git clone https://github.com/vesecikaaqii/MachineLearning.git
 cd MachineLearning
 
 # 2. Create a virtual environment 
@@ -103,15 +103,16 @@ models/
 └── scaler_phase2.pkl       
 
 reports/
-├── phase2_training_summary.json             
-├── phase2_correlation_heatmap.png  
-├── phase2_feature_importance.png   
-└── phase2_pred_vs_true.png         
+├── phase2_training_summary.json
+├── phase2_training_log.txt
+├── phase2_correlation_heatmap.png
+├── phase2_feature_importance.png
+└── phase2_pred_vs_true.png
 ```
 
 ---
 
-## 4. Dataset Description
+## Dataset Description
 
 | Property | Value |
 |----------|-------|
@@ -288,12 +289,13 @@ A complete, clean, and well-structured foundation for Kosovo weather modelling:
 
 ### Temperature Analysis
 
-| Category | Result |
-|----------|--------|
-| Warmest cities | Pristina, Prizren |
-| Coldest cities | Dragash, Deçan |
-| Average difference | ~7 °C – 10 °C |
-| Observed phenomenon | Urban Heat Island effect |
+| Metric | Value |
+|--------|-------|
+| Overall minimum (°C) | −2.30 |
+| Overall mean (°C) | 8.82 |
+| Overall maximum (°C) | 23.70 |
+| Standard deviation (°C) | 4.93 |
+| Expected regional spread | mountain municipalities (e.g. Dragash, Deçan) tend to record the coldest values; lower-altitude cities (e.g. Gjakova, Prizren) the warmest — a per-city breakdown is produced in Phase III. |
 
 ### Wind and Pressure Analysis
 
@@ -361,7 +363,7 @@ Three visualisations are produced during training:
   <tr>
     <td align="center"><sub>Correlations across meteorological features</sub></td>
     <td align="center"><sub>Model predictions against the ideal diagonal</sub></td>
-    <td align="center"><sub>Humidity, pressure, and clouds dominate</sub></td>
+    <td align="center"><sub>Humidity and seasonal/diurnal cycles dominate</sub></td>
   </tr>
 </table>
 
@@ -471,7 +473,35 @@ The points cluster tightly along the ideal diagonal (dashed line) — the model 
 
 # PHASE III — Analysis and Evaluation (planned)
 
-Phase III is **not yet executed**. It is structured as a sequence of three work-streams: **(A) rigorous evaluation** of the Phase II baseline, **(B) feature engineering + hyperparameter re-training**, and **(C) quantitative comparison** against both the Phase II model and simple reference baselines.
+## Objective of the Phase
+
+Phase III closes the ML workflow started in Phases I–II: it **rigorously evaluates** the Phase II Random Forest, **re-trains** it with tuned hyperparameters and engineered features, **compares** the outcome against trivial baselines and the Phase II model itself, and **interprets** what the improvements mean in practice for Kosovo.
+
+> **Important conceptual shift in Phase III.** The Phase II model is a **diagnostic "nowcast"**: it estimates the temperature at hour `t` from other meteorological variables measured **at the same hour `t`** (humidity, pressure, wind, clouds). It never looks into the past, so it cannot predict the future either — feeding it tomorrow's humidity/pressure isn't possible, because those values don't exist yet. Phase III turns the model into a **true short-horizon forecaster** by adding **lag features** (`temp_lag_1h`, `temp_lag_24h`, …) and evaluating on a **chronological hold-out window** (train on the first ~25 days, test on the last ~6 days). This is the single most important upgrade between Phase II and Phase III: from "given these simultaneous inputs, what is the temperature now?" to "given the last N hours, what is the temperature at `t+1`?".
+
+### Scope split between Phase II and Phase III
+
+To set realistic expectations, the two phases address complementary problems on non-overlapping time horizons:
+
+| Dimension | Phase II (current) | Phase III (planned) |
+|-----------|--------------------|---------------------|
+| **Problem** | Diagnostic reconstruction | True short-horizon forecasting |
+| **Time horizon** | Any historical hour up to **yesterday** (−1 day, bounded by the ~1-day ERA5 lag) | **+1 h to +24 h** ahead of the last observed hour |
+| **Input** | Simultaneous meteorological variables at hour `t` | History of the last N hours (lag features) |
+| **Output** | `temp(t)` given `features(t)` | `temp(t + h)` for `h ∈ {1, 3, 6, 12, 24}` hours ahead |
+| **Train/test split** | Random 80 / 20 | Chronological — train on the first ~25 days, test on the last ~6 days |
+| **Realistic MAE** | ~1.08 °C (achieved) | ~0.3–0.5 °C at `+1 h`, degrading to ~2–2.5 °C at `+24 h` |
+| **Explicitly out of scope** | Future predictions | Multi-day / multi-week / monthly forecasts (require multi-year data + sequence models — see §I. Future Work) |
+
+This split lets Phase II serve as a *sanity baseline* (how well can we recover temperature from same-hour inputs?) and Phase III as the actual *operational forecaster* (how well can we predict the next few hours?). Monthly or seasonal prediction is deliberately **not** a goal of this project.
+
+The phase is structured as a sequence of four work-streams that mirror the rhythm of Phase II (objective → approach → preprocessing extensions → results → conclusions): **(A) rigorous evaluation**, **(B) feature engineering + hyperparameter re-training**, **(C) quantitative comparison**, and **(D) discussion, conclusions, and outlook**.
+
+- **Evaluation script (planned):** [`phase3_evaluation.py`](phase3_evaluation.py)
+- **Re-training script (planned):** [`phase3_retraining.py`](phase3_retraining.py)
+- **Machine-readable summary (planned):** [`reports/phase3_evaluation_summary.json`](reports/phase3_evaluation_summary.json)
+
+> **Status:** Phase III is **not yet executed**. The sections below describe the full protocol that will be followed; numerical entries marked `TBD` are placeholders that will be filled in after the Phase III scripts are run.
 
 ## A. In-Depth Evaluation of the Phase II Baseline
 
@@ -536,10 +566,3 @@ Every Phase III model is compared not only to the Phase II Random Forest but als
 | RF — tuned (B.2)   | TBD | TBD | TBD | TBD | hyperparameter tuning only |
 | RF — tuned + lag features | TBD | TBD | TBD | TBD | + B.1 lag family |
 | **RF — final (tuned + all features)** | **TBD** | **TBD** | **TBD** | **TBD** | Phase III winner |
-
-## D. Deliverables & Outlook
-
-- `phase3_evaluation.py` — runs A.1–A.7 on the Phase II model and saves plots to `reports/`.
-- `phase3_retraining.py` — runs B.1–B.2 and saves the final model to `models/rf_model_v2.pkl`.
-- `reports/phase3_evaluation_summary.json` — all metrics in machine-readable form.
-- Updated README section with the populated Table C.2 and an interpretation of *who benefits* from the improvement (agriculture, energy demand, public-health advisories).
