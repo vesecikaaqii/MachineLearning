@@ -33,8 +33,6 @@ def get_resilient_session():
     return session
 
 def fetch_historical_weather():
-    # Open-Meteo Archive (ERA5) lags ~1 day behind real time, so we shift the
-    # end date back by 2 days to stay safely inside the allowed range.
     end_date = datetime.now().date() - timedelta(days=2)
     start_date = end_date - timedelta(days=31)
 
@@ -71,7 +69,6 @@ def fetch_historical_weather():
     if all_city_dataframes:
         df_final = pd.concat(all_city_dataframes, ignore_index=True)
 
-        # Cleanup
         df_final.rename(columns={'time': 'datetime'}, inplace=True)
         df_final['datetime'] = pd.to_datetime(df_final['datetime'])
         df_final["hour"] = df_final["datetime"].dt.hour
@@ -79,12 +76,17 @@ def fetch_historical_weather():
         df_final["month"] = df_final["datetime"].dt.month
         df_final["year"] = df_final["datetime"].dt.year
 
-        df_final = df_final.head(30000)
+        df_final = df_final.sort_values(["city", "datetime"]).reset_index(drop=True)
+        df_final = df_final.drop_duplicates(subset=["city", "datetime"]).reset_index(drop=True)
+
+        null_total = int(df_final.isna().sum().sum())
+        if null_total > 0:
+            logging.warning(f"Dataset contains {null_total} NaN cells — Phase II will apply defensive dropna/fillna.")
 
         file_name = "kosovo_weather_dataset.csv"
         df_final.to_csv(file_name, index=False)
-        
-        logging.info(f"✅ Success! Exact rows to {file_name}.")
+
+        logging.info(f"Saved {len(df_final)} rows to {file_name}.")
     else:
         logging.error("No data extracted.")
 

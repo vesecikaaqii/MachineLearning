@@ -43,7 +43,7 @@ A Machine Learning project that builds a complete, reproducible pipeline — fro
 
 | Phase | Title | Status |
 |-------|-------|--------|
-| I  | **Model Preparation** — data collection, cleaning, EDA, task definition | Completed |
+| I  | **Model Preparation** — data collection, cleaning, task definition | Completed |
 | II | **Model Training** — train a single supervised algorithm | Completed |
 | III | **Analysis and Evaluation** — evaluate, re-train, improve | Planned |
 
@@ -131,14 +131,12 @@ reports/
 
 `datetime`, `temperature_2m`, `relative_humidity_2m`, `apparent_temperature`, `precipitation`, `surface_pressure`, `cloud_cover`, `wind_speed_10m`, `wind_direction_10m`, `city`, `hour`, `day`, `month`, `year`.
 
-> During Phase II the meteorological columns are renamed to shorter canonical names used by the model pipeline: `temperature_2m` → `temperature`, `relative_humidity_2m` → `humidity`, `surface_pressure` → `pressure`, `wind_speed_10m` → `wind_speed`, `wind_direction_10m` → `wind_deg`, `cloud_cover` → `clouds`, `precipitation` → `pop`.
-
 ---
 
 ## About the Project
 
 ### The problem
-Accurate short-term temperature forecasts are essential for agriculture planning, energy demand prediction, public-health advisories, and daily citizen decisions. Commercial weather services provide generic forecasts, but **small, region-specific models tuned on local data** often capture micro-climatic behaviour (e.g. the urban-heat-island effect in Pristina, or the cooler mountain valleys around Dragash) more faithfully than global models.
+Accurate short-term temperature forecasts are essential for agriculture planning, energy demand prediction, public-health advisories, and daily citizen decisions. Commercial weather services provide generic forecasts, but **small, region-specific models tuned on local data** often capture micro-climatic behaviour more faithfully than global models.
 
 ### The idea
 Build a **supervised Machine-Learning pipeline** that ingests real meteorological data from the [Open-Meteo Archive API](https://open-meteo.com/en/docs/historical-weather-api) for all 27 municipalities of Kosovo and learns to **predict the air temperature** (°C) from other observable variables — humidity, pressure, wind speed, cloud coverage, precipitation, and the time of day.
@@ -166,7 +164,8 @@ Phase I lays the foundation of the whole project: **collecting, structuring, and
    - queries the `archive-api.open-meteo.com/v1/archive` endpoint for the last ~31 days,
    - requests hourly `temperature_2m`, `relative_humidity_2m`, `apparent_temperature`, `precipitation`, `surface_pressure`, `cloud_cover`, `wind_speed_10m`, `wind_direction_10m` (timezone `Europe/Belgrade`).
 4. **Persistence to CSV** as [`kosovo_weather_dataset.csv`](kosovo_weather_dataset.csv), automatically appending the columns `hour`, `day`, `month`, and `year` for temporal analysis.
-5. **Integrity verification** (no duplicates, no empty rows in the primary target columns — the dataset ships with **zero NaN** across all 14 columns).
+5. **Preprocessing inside the scraper** — deterministic sort by `(city, datetime)`, `drop_duplicates` on the `(city, datetime)` primary key, and a logged NaN count (see §Preprocessing Performed in Phase I below for the full list).
+6. **Integrity verification** — the dataset ships with **zero duplicates and zero NaN** across all 14 columns.
 
 ## Defined Machine-Learning Tasks
 
@@ -174,10 +173,8 @@ The dataset built in this phase is designed to support two main ML tasks across 
 
 | # | Task | Type | Target (output) | Main input features |
 |---|------|------|-----------------|---------------------|
-| 1 | Temperature forecasting | **Regression (supervised)** | `temperature` (°C, numeric) | humidity, pressure, clouds, wind_speed, cyclic time |
-| 2 | Sequential time-series forecasting | Time-series (future work) | `temperature[t+1]` | lagged multi-hour windows per city |
-
-> Note: the previous "weather-state classification" task depended on a categorical `weather` column produced by OpenWeatherMap. Open-Meteo's archive endpoint does not return that field, so that task has been dropped in favour of a single well-defined regression problem.
+| 1 | Temperature forecasting | **Regression (supervised)** | `temperature_2m` (°C, numeric) | `relative_humidity_2m`, `surface_pressure`, `cloud_cover`, `wind_speed_10m`, cyclic time |
+| 2 | Sequential time-series forecasting | Time-series (future work) | `temperature_2m[t+1]` | lagged multi-hour windows per city |
 
 ## Attribute Types
 
@@ -203,8 +200,6 @@ Out of 14 total columns, the structural split is:
 | `cloud_cover` (%) | 0 | 64.49 | 39.58 | 100 |
 | `precipitation` (mm) | 0.00 | 0.06 | 0.28 | 5.50 |
 
-> `surface_pressure` is reported at station altitude (not sea-level adjusted), which is why the mean sits below the standard 1013 hPa — many Kosovo stations sit hundreds of metres above sea level.
-
 ## Missing Values
 
 | Column | Missing | Treatment |
@@ -213,25 +208,26 @@ Out of 14 total columns, the structural split is:
 
 **Total NaN in the dataset: 0 / (20,736 × 14 = 290,304 cells) → 0.00 %** — the Open-Meteo archive returns fully-populated hourly records.
 
+## Preprocessing Performed in Phase I
+
+The following preprocessing steps run automatically inside [`weather_data_scraper.py`](weather_data_scraper.py) after the API responses are concatenated, producing a model-ready CSV:
+
+1. **Datetime parsing** — the raw `time` column is renamed to `datetime` and converted to `pandas` datetime.
+2. **Temporal feature derivation** — `hour`, `day`, `month`, and `year` are extracted from `datetime` for later cyclic encoding in Phase II.
+3. **Deterministic ordering** — rows are sorted by `(city, datetime)` so every downstream step (including the Phase III chronological split) is reproducible.
+4. **Deduplication** — `drop_duplicates(subset=["city", "datetime"])` guarantees a unique hour-per-city primary key; the scraper logs how many duplicates were removed (currently 0).
+5. **Null verification** — total NaN count is logged; the scraper emits a warning if any cell is null, so the downstream pipeline can trigger its defensive imputation.
+
+Further transformations — cyclic encoding of `hour`/`month` via `sin/cos`, and `StandardScaler` fit on the training partition — are deferred to Phase II, where they belong logically next to the model fit.
+
 ## Why these attributes?
 
 - **Core meteorological variables** (`temperature_2m`, `relative_humidity_2m`, `surface_pressure`, `wind_speed_10m`, `wind_direction_10m`, `cloud_cover`) — standard physical inputs for atmospheric modelling.
 - **`apparent_temperature`** — "feels-like" temperature, useful as a sanity reference and for later multi-target experiments.
-- **`precipitation`** (mm in the last hour) — ground-truth rainfall; replaces the probabilistic `pop` field from the old OpenWeatherMap pipeline and is renamed to `pop` inside the training script for pipeline compatibility.
+- **`precipitation`** (mm in the last hour) — ground-truth rainfall from the Open-Meteo archive, used directly in the model pipeline.
 - **`hour`, `day`, `month`, `year`** — automatically derived to capture **temporal cycles** (diurnal / seasonal); `hour` and `month` are later encoded cyclically with `sin / cos`.
 - **`city`** — enables per-city modelling or regional climate grouping.
 - **lat / lon coordinates** are not stored in the CSV because they are static per city and can be re-joined from `weather_data_scraper.py`.
-
-## Phase I Outcome
-
-A complete, clean, and well-structured foundation for Kosovo weather modelling:
-- **20,736 instances × 14 attributes**, with **0 % NaN** (no imputation required),
-- **2 ML tasks clearly defined** (regression now, time-series as future work),
-- descriptive statistics fully documented for all numeric attributes,
-- a supervised regression algorithm selected and justified,
-- ready to be trained in Phase II without requiring further major cleaning.
-
----
 
 ## Dataset Overview and Exploratory Insights
 
@@ -326,8 +322,6 @@ A complete, clean, and well-structured foundation for Kosovo weather modelling:
 
 ## Selected Algorithm
 
-In accordance with the professor's brief (*"Students must implement **any one** of the applicable ML algorithms..."*), the project focuses on a **single algorithm**: **Random Forest Regressor** — an ensemble of decision trees for regression (supervised learning).
-
 | Phase | Random Forest Configuration | Status |
 |-------|----------------------------|--------|
 | Phase I | Data preparation + algorithm selection (no training yet) | Completed |
@@ -378,16 +372,6 @@ Three visualisations are produced during training:
 | **No feature scaling required** | Trees are scale-invariant — this simplifies the pipeline and reduces the risk of pre-processing mistakes. |
 | **Interpretability** | Provides built-in **feature importances**, helping verify that the model learned physically meaningful relationships, not artefacts. |
 
-## Data Preprocessing
-
-1. **Rename Open-Meteo columns** to the canonical model names (`temperature_2m` → `temperature`, `relative_humidity_2m` → `humidity`, `surface_pressure` → `pressure`, `wind_speed_10m` → `wind_speed`, `wind_direction_10m` → `wind_deg`, `cloud_cover` → `clouds`, `precipitation` → `pop`).
-2. **Drop rows with missing values** in `temperature`, `humidity`, `pressure` (defensive; the current dataset has none).
-3. **Fill `pop`** with `0.0` as a safety net (no-ops on the current CSV where every hour already has a precipitation value).
-4. **Cyclic encoding of time** using `sin / cos` for `hour` and `month`:
-   - Reason: `23:00` and `00:00` are adjacent in time but appear numerically far apart. `sin / cos` preserves the cyclic adjacency.
-5. **80 / 20 train / test split** with `random_state = 42` for reproducibility.
-6. **`StandardScaler`** is fitted on the training set and saved for future pipeline compatibility; Random Forest itself does not require scaling.
-
 ### Split sizes
 
 | Split | Row count | Share |
@@ -398,21 +382,21 @@ Three visualisations are produced during training:
 
 ### Input features (10)
 
-`humidity, pressure, wind_speed, wind_deg, clouds, pop, hour_sin, hour_cos, month_sin, month_cos`
+`relative_humidity_2m, surface_pressure, wind_speed_10m, wind_direction_10m, cloud_cover, precipitation, hour_sin, hour_cos, month_sin, month_cos`
 
-**Target:** `temperature` (°C, numeric).
+**Target:** `temperature_2m` (°C, numeric).
 
 ## Correlation heat-map (produced during training)
 
 ![Correlation Heatmap](reports/phase2_correlation_heatmap.png)
 
-| Feature | \|corr\| with `temperature` |
+| Feature | \|corr\| with `temperature_2m` |
 |---------|-----------------------------|
-| `humidity`   | **0.684** (strongest) |
-| `pressure`   | 0.318 |
-| `wind_speed` | 0.161 |
-| `clouds`     | 0.138 |
-| `pop`        | 0.133 |
+| `relative_humidity_2m`   | **0.672** (strongest) |
+| `surface_pressure`       | 0.315 |
+| `wind_speed_10m`         | 0.137 |
+| `precipitation`          | 0.128 |
+| `cloud_cover`            | 0.123 |
 
 Humidity is the strongest predictor — a physically expected result, since warmer air typically holds less relative humidity.
 
@@ -432,10 +416,10 @@ The baseline configuration is a deliberately *simple* Random Forest — reasonab
 
 | Metric | Value |
 |--------|-------|
-| MAE (test)  | **1.082 °C** |
-| RMSE (test) | **1.564 °C** |
-| R² (train)  | 0.9857 |
-| R² (test)   | **0.9003** |
+| MAE (test)  | **1.041 °C** |
+| RMSE (test) | **1.478 °C** |
+| R² (train)  | 0.9863 |
+| R² (test)   | **0.9069** |
 
 ### Predicted vs. Actual
 
@@ -449,24 +433,24 @@ The points cluster tightly along the ideal diagonal (dashed line) — the model 
 
 | Feature | Importance |
 |---------|-----------|
-| `humidity`   | **0.474** |
-| `month_cos`  | 0.097 |
-| `month_sin`  | 0.095 |
-| `pressure`   | 0.069 |
-| `hour_cos`   | 0.062 |
-| `hour_sin`   | 0.057 |
-| `wind_deg`   | 0.050 |
-| `clouds`     | 0.050 |
-| `wind_speed` | 0.041 |
-| `pop`        | 0.005 |
+| `relative_humidity_2m` | **0.468** |
+| `month_cos`            | 0.101 |
+| `month_sin`            | 0.087 |
+| `surface_pressure`     | 0.071 |
+| `hour_cos`             | 0.066 |
+| `hour_sin`             | 0.063 |
+| `wind_direction_10m`   | 0.050 |
+| `cloud_cover`          | 0.049 |
+| `wind_speed_10m`       | 0.041 |
+| `precipitation`        | 0.005 |
 
- Humidity dominates the temperature prediction, followed by the seasonal (`month_*`) and diurnal (`hour_*`) cyclic features — a physically sensible ranking for a 31-day, hourly dataset that straddles a seasonal transition. `pop` is near-zero because precipitation rarely drives temperature on an hour-by-hour basis.
+ Humidity dominates the temperature prediction, followed by the seasonal (`month_*`) and diurnal (`hour_*`) cyclic features — a physically sensible ranking for a 31-day, hourly dataset that straddles a seasonal transition. `precipitation` is near-zero because rainfall rarely drives temperature on an hour-by-hour basis.
 
 ### Note on the evaluation split
 
 Phase II uses a **random 80 / 20 train/test split**, which is the standard practice for supervised regression tasks. However, because the dataset is hourly and strongly autocorrelated in time, a random split lets adjacent hours of the same city end up on opposite sides of the partition (e.g. Pristina at 04:00 in train, Pristina at 05:00 in test). These neighbouring rows have nearly identical temperatures, which gives the model an easier task than it would face in production.
 
-The practical consequence is a **mild temporal leakage**: the Phase II metrics (MAE ≈ 1.08 °C, R² ≈ 0.90) should be read as the **upper bound** of the model's true generalisation capability, not as the honest forecasting error.
+The practical consequence is a **mild temporal leakage**: the Phase II metrics (MAE ≈ 1.04 °C, R² ≈ 0.91) should be read as the **upper bound** of the model's true generalisation capability, not as the honest forecasting error.
 
 This is an expected limitation of the Phase II baseline, not a defect — a diagnostic regression does not need a forecasting-grade split. Phase III re-evaluates the same model on a **chronological hold-out** (train on the first ~25 days, test on the last ~6 days — see §A.2 of the Phase III plan) to measure the true forecasting skill. The gap between the random-split metrics and the chronological-split metrics quantifies the leakage.
 
@@ -474,7 +458,7 @@ This is an expected limitation of the Phase II baseline, not a defect — a diag
 
 1. **A single supervised algorithm — Random Forest Regressor — was successfully trained**.
 2. The **train / test split (16,588 / 4,148)** is explicit and reproducible.
-3. The trained model achieves **MAE = 1.08 °C** and **R² (test) = 0.90** on held-out data.
+3. The trained model achieves **MAE = 1.04 °C** and **R² (test) = 0.91** on held-out data.
 4. The **feature-importance ranking is physically interpretable**, confirming the model learned meaningful signal (humidity + seasonal/diurnal cycles dominate).
 5. All artifacts (trained model, scaler, training log, plots) are serialised in [`models/`](models/) and [`reports/`](reports/), ready for the next phase.
 6. The random-split evaluation is acknowledged as an **upper bound** on the true error; Phase III will re-measure the model with a chronological hold-out to quantify and remove the temporal leakage.
@@ -495,8 +479,8 @@ Phase III re-evaluates the Phase II model with a rigorous protocol, re-trains it
 - **Learning curves** — MAE / R² vs training-set size to check whether more data would still help.
 - **Permutation importance** — replaces the impurity-based ranking, which over-rewards high-cardinality features.
 - **Hyperparameter tuning** — GridSearchCV over `n_estimators`, `max_depth`, `min_samples_leaf`, `min_samples_split`, `max_features`.
-- **Lag features** (biggest win) — `temp_lag_1h`, `temp_lag_3h`, `temp_lag_24h`, `humidity_lag_1h`, `pressure_lag_1h`, built per city on chronologically-sorted data.
-- **Rolling / delta / interaction features** — 3 h / 24 h rolling mean & std, pressure & humidity deltas, physical interactions (`humidity × clouds`).
+- **Lag features** (biggest win) — 1-hour, 3-hour, and 24-hour lags of `temperature_2m`, `relative_humidity_2m`, and `surface_pressure`, built per city on chronologically-sorted data.
+- **Rolling / delta / interaction features** — 3 h / 24 h rolling mean & std of `temperature_2m`, `relative_humidity_2m`, `surface_pressure`; short-term deltas of pressure and humidity; physical interactions such as `relative_humidity_2m × cloud_cover`.
 - **Per-city encoding** — one-hot or target encoding so the model distinguishes Pristina from Dragash.
 - **Baseline comparison** — Random Forest vs global mean, per-city mean, 1-hour persistence, and linear regression.
 - **Multi-horizon evaluation** — report final MAE at +1 h, +3 h, +6 h, +12 h, +24 h, +48 h.

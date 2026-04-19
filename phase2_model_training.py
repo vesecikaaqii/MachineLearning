@@ -37,18 +37,8 @@ log("=" * 70)
 df = pd.read_csv(DATA_PATH)
 df["datetime"] = pd.to_datetime(df["datetime"])
 
-df = df.rename(columns={
-    "temperature_2m":      "temperature",
-    "relative_humidity_2m": "humidity",
-    "surface_pressure":    "pressure",
-    "wind_speed_10m":      "wind_speed",
-    "wind_direction_10m":  "wind_deg",
-    "cloud_cover":         "clouds",
-    "precipitation":       "pop",
-})
-
-df = df.dropna(subset=["temperature", "humidity", "pressure"]).reset_index(drop=True)
-df["pop"] = df["pop"].fillna(0.0)
+df = df.dropna(subset=["temperature_2m", "relative_humidity_2m", "surface_pressure"]).reset_index(drop=True)
+df["precipitation"] = df["precipitation"].fillna(0.0)
 
 df["hour_sin"]  = np.sin(2 * np.pi * df["hour"]  / 24.0)
 df["hour_cos"]  = np.cos(2 * np.pi * df["hour"]  / 24.0)
@@ -56,18 +46,18 @@ df["month_sin"] = np.sin(2 * np.pi * df["month"] / 12.0)
 df["month_cos"] = np.cos(2 * np.pi * df["month"] / 12.0)
 
 FEATURES = [
-    "humidity", "pressure", "wind_speed", "wind_deg",
-    "clouds", "pop",
+    "relative_humidity_2m", "surface_pressure", "wind_speed_10m", "wind_direction_10m",
+    "cloud_cover", "precipitation",
     "hour_sin", "hour_cos", "month_sin", "month_cos",
 ]
-TARGET = "temperature"
+TARGET = "temperature_2m"
 
 log(f"Rows after cleaning : {len(df)}")
 log(f"Features ({len(FEATURES)})       : {FEATURES}")
 log(f"Target              : {TARGET} (deg C)")
 
-corr_cols = ["temperature", "humidity", "pressure", "wind_speed",
-             "clouds", "pop"]
+corr_cols = ["temperature_2m", "relative_humidity_2m", "surface_pressure", "wind_speed_10m",
+             "cloud_cover", "precipitation"]
 corr = df[corr_cols].corr()
 
 plt.figure(figsize=(7, 5))
@@ -78,7 +68,7 @@ plt.savefig(os.path.join(REPORTS_DIR, "phase2_correlation_heatmap.png"), dpi=150
 plt.close()
 
 log("\nStrongest absolute correlations with temperature:")
-log(corr["temperature"].drop("temperature").abs().sort_values(ascending=False).to_string())
+log(corr["temperature_2m"].drop("temperature_2m").abs().sort_values(ascending=False).to_string())
 
 X = df[FEATURES].values
 y = df[TARGET].values

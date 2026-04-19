@@ -5,18 +5,18 @@
   "train_size": 16588,
   "test_size": 4148,
   "features": [
-    "humidity",
-    "pressure",
-    "wind_speed",
-    "wind_deg",
-    "clouds",
-    "pop",
+    "relative_humidity_2m",
+    "surface_pressure",
+    "wind_speed_10m",
+    "wind_direction_10m",
+    "cloud_cover",
+    "precipitation",
     "hour_sin",
     "hour_cos",
     "month_sin",
     "month_cos"
   ],
-  "target": "temperature",
+  "target": "temperature_2m",
   "config": {
     "n_estimators": 100,
     "max_depth": null,
@@ -25,21 +25,21 @@
     "n_jobs": -1
   },
   "metrics": {
-    "MAE": 1.054733847637416,
-    "RMSE": 1.5385885413632432,
-    "R2_train": 0.986690097646138,
-    "R2_test": 0.8993370143791269
+    "MAE": 1.0411559787849567,
+    "RMSE": 1.4782447576108804,
+    "R2_train": 0.9863106092563392,
+    "R2_test": 0.9068625635924475
   },
   "feature_importance": {
-    "humidity": 0.4703189587161552,
-    "month_cos": 0.09439724674006846,
-    "month_sin": 0.09318797399111771,
-    "pressure": 0.06862153744680487,
-    "hour_cos": 0.06492774101231628,
-    "hour_sin": 0.06207868520078759,
-    "clouds": 0.05175453323395965,
-    "wind_deg": 0.04942587077852921,
-    "wind_speed": 0.03997693975623078,
-    "pop": 0.00531051312403041
+    "relative_humidity_2m": 0.4681583791509601,
+    "month_cos": 0.10061622549147747,
+    "month_sin": 0.08665079525024162,
+    "surface_pressure": 0.07088102616843855,
+    "hour_cos": 0.06590506427969556,
+    "hour_sin": 0.06278608208619586,
+    "wind_direction_10m": 0.050158469362579026,
+    "cloud_cover": 0.04922979175695804,
+    "wind_speed_10m": 0.040644070005349024,
+    "precipitation": 0.0049700964481048816
   }
 }
