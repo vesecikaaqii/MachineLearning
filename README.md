@@ -330,6 +330,7 @@ In accordance with the professor's brief (*"Students must implement **any one** 
 
 | Phase | Random Forest Configuration | Status |
 |-------|----------------------------|--------|
+| Phase I | Data preparation + algorithm selection (no training yet) | Completed |
 | Phase II | Baseline training (100 trees, default leaf, random_state = 42) | Completed |
 | Phase III | Re-training + evaluation (hyperparameter tuning with GridSearchCV, anti-overfitting, feature engineering) | Planned |
 
@@ -482,157 +483,21 @@ This is an expected limitation of the Phase II baseline, not a defect — a diag
 
 # PHASE III — Analysis and Evaluation (planned)
 
-## Objective of the Phase
+Phase III re-evaluates the Phase II model with a rigorous protocol, re-trains it with tuned hyperparameters and new features, and turns it into a true short-horizon forecaster (1–24 h ahead). The dataset stays as is (20,736 rows, ~31 days) — every improvement comes from the model, features, or evaluation protocol.
 
-Phase III closes the ML workflow started in Phases I–II: it **rigorously evaluates** the Phase II Random Forest, **re-trains** it with tuned hyperparameters and engineered features, **compares** the outcome against trivial baselines and the Phase II model itself, and **interprets** what the improvements mean in practice for Kosovo.
+**Status:** not yet executed. The points below are the plan.
 
-> **Important conceptual shift in Phase III.** The Phase II model is a **diagnostic "nowcast"**: it estimates the temperature at hour `t` from other meteorological variables measured **at the same hour `t`** (humidity, pressure, wind, clouds). It never looks into the past, so it cannot predict the future either — feeding it tomorrow's humidity/pressure isn't possible, because those values don't exist yet. Phase III turns the model into a **true short-horizon forecaster** by adding **lag features** (`temp_lag_1h`, `temp_lag_24h`, …) and evaluating on a **chronological hold-out window** (train on the first ~25 days, test on the last ~6 days). This is the single most important upgrade between Phase II and Phase III: from "given these simultaneous inputs, what is the temperature now?" to "given the last N hours, what is the temperature at `t+1`?".
+## Main points we will do
 
-### Scope split between Phase II and Phase III
+- **Chronological split** — train on the first ~25 days, hold out the last ~6 days. Removes the temporal leakage of the random 80/20 split used in Phase II.
+- **K-fold cross-validation** — 5-fold CV on the full dataset for stable mean ± std of MAE, RMSE, R².
+- **Residual diagnostics** — histogram, Q–Q plot, residuals vs predicted; error broken down by hour of day, city (27 levels), and temperature quartile.
+- **Learning curves** — MAE / R² vs training-set size to check whether more data would still help.
+- **Permutation importance** — replaces the impurity-based ranking, which over-rewards high-cardinality features.
+- **Hyperparameter tuning** — GridSearchCV over `n_estimators`, `max_depth`, `min_samples_leaf`, `min_samples_split`, `max_features`.
+- **Lag features** (biggest win) — `temp_lag_1h`, `temp_lag_3h`, `temp_lag_24h`, `humidity_lag_1h`, `pressure_lag_1h`, built per city on chronologically-sorted data.
+- **Rolling / delta / interaction features** — 3 h / 24 h rolling mean & std, pressure & humidity deltas, physical interactions (`humidity × clouds`).
+- **Per-city encoding** — one-hot or target encoding so the model distinguishes Pristina from Dragash.
+- **Baseline comparison** — Random Forest vs global mean, per-city mean, 1-hour persistence, and linear regression.
+- **Multi-horizon evaluation** — report final MAE at +1 h, +3 h, +6 h, +12 h, +24 h, +48 h.
 
-To set realistic expectations, the two phases address complementary problems on non-overlapping time horizons:
-
-| Dimension | Phase II (current) | Phase III (planned) |
-|-----------|--------------------|---------------------|
-| **Problem** | Diagnostic reconstruction | True short-horizon forecasting |
-| **Time horizon** | Any historical hour up to **yesterday** (−1 day, bounded by the ~1-day ERA5 lag) | **+1 h to +24 h** ahead of the last observed hour |
-| **Input** | Simultaneous meteorological variables at hour `t` | History of the last N hours (lag features) |
-| **Output** | `temp(t)` given `features(t)` | `temp(t + h)` for `h ∈ {1, 3, 6, 12, 24}` hours ahead |
-| **Train/test split** | Random 80 / 20 | Chronological — train on the first ~25 days, test on the last ~6 days |
-| **Realistic MAE** | ~1.08 °C (achieved, random-split upper bound) | ~0.55–0.85 °C at `+1 h` on the chronological hold-out, degrading to ~2–2.5 °C at `+24 h` |
-| **Explicitly out of scope** | Future predictions | Multi-day / multi-week / monthly forecasts (require multi-year data + sequence models — see §I. Future Work) |
-
-This split lets Phase II serve as a *sanity baseline* (how well can we recover temperature from same-hour inputs?) and Phase III as the actual *operational forecaster* (how well can we predict the next few hours?). Monthly or seasonal prediction is deliberately **not** a goal of this project.
-
-### Phase III Improvements Roadmap (executed on the same 20,736-row dataset)
-
-Phase III does **not** change the dataset — it stays at the existing **~31 days × 27 cities × 24 hours = 20,736 rows**. Every improvement below is achieved by changing the *model*, the *features*, or the *evaluation protocol*, not by collecting more data. Scaling to a multi-year dataset is deliberately deferred to §I. Future Work.
-
-The phase is structured as a sequence of four work-streams that mirror the rhythm of Phase II (objective → approach → preprocessing extensions → results → conclusions): **(A) rigorous evaluation**, **(B) feature engineering + hyperparameter re-training**, **(C) quantitative comparison**, and **(D) discussion, conclusions, and outlook**.
-
-The table below summarises the seven concrete improvements, the Phase II weakness each one addresses, and the expected impact:
-
-| # | Improvement | Phase II weakness it fixes | Expected MAE impact |
-|---|-------------|----------------------------|---------------------|
-| 1 | **Chronological split** (§A.2) | Random 80/20 leaks adjacent hours across train/test (~0.27 °C optimism) | +0.3 °C (unmasks the true error) |
-| 2 | **K-fold CV** (§A.1) | Single train/test split is a point estimate with unknown variance | ±0.1 °C confidence band |
-| 3 | **Per-city / per-hour residual atlas** (§A.5) | Phase II reports one global MAE — no idea which cities/hours fail most | Diagnostic, not a number |
-| 4 | **Hyperparameter tuning** (§B.2) | Phase II uses defaults (100 trees, unlimited depth, leaf = 1) | −0.05 to −0.10 °C |
-| 5 | **Lag features** (§B.1, **biggest single win**) | Phase II has no memory of recent hours — cannot forecast anything | −0.5 to −0.8 °C |
-| 6 | **Rolling / delta / interaction features** (§B.1) | Phase II sees only point values, not trends | −0.05 to −0.15 °C |
-| 7 | **Per-city encoding** (§B.1) | Phase II treats Pristina and Dragash identically | −0.05 to −0.15 °C |
-
-**Starting point** (Phase II, random-split, upper bound): MAE ≈ 1.08 °C, R² ≈ 0.90.
-**Expected chronological baseline** (same model, honest evaluation): MAE ≈ 1.35 °C, R² ≈ 0.84.
-**Target after Phase III**: MAE ≈ 0.55–0.85 °C at `+1 h`, R² > 0.94 on the chronological hold-out.
-
-This is the quantitative story we will tell the professor: *"we identified three weaknesses in the Phase II baseline (leakage, no memory, no location awareness), quantified each, and closed them step by step."*
-
-- **Evaluation script (planned):** [`phase3_evaluation.py`](phase3_evaluation.py)
-- **Re-training script (planned):** [`phase3_retraining.py`](phase3_retraining.py)
-- **Machine-readable summary (planned):** [`reports/phase3_evaluation_summary.json`](reports/phase3_evaluation_summary.json)
-
-> **Status:** Phase III is **not yet executed**. The sections below describe the full protocol that will be followed; numerical entries marked `TBD` are placeholders that will be filled in after the Phase III scripts are run.
-
-## A. In-Depth Evaluation of the Phase II Baseline
-
-The goal of this stage is to look at the Phase II model from every angle a reviewer might object to — not to replace it, but to measure how it *really* behaves before we start improving it.
-
-| # | Task | Detail | Expected finding |
-|---|------|--------|------------------|
-| 1 | **K-Fold Cross-Validation** | 5-fold CV on the full 20,736 rows — report mean ± std of MAE, RMSE, R². | CV MAE ≈ 1.05–1.10 °C with std ≤ 0.05 °C (confirms random-split estimate is stable). |
-| 2 | **Time-based (chronological) split** | Train on the first ~25 days (~16,600 rows), hold out the last ~6 days (~4,100 rows). Measures true forecasting skill (a random split leaks information from the future). | MAE rises to ≈ 1.30–1.45 °C, R² drops to ≈ 0.82–0.86 — quantifies the leakage. |
-| 3 | **Train-vs-test gap analysis** | Current gap: R²_train = 0.986 vs R²_test = 0.900 (Δ = 0.086). Re-measure the gap on the chronological split. | Gap widens to ≈ 0.14–0.17, confirming moderate overfitting. |
-| 4 | **Residual diagnostics** | Histogram of residuals, Q–Q plot, residuals vs predicted (heteroscedasticity check). | Residuals should be roughly zero-mean, symmetric, with slightly heavier tails at cold/warm extremes. |
-| 5 | **Error breakdown** by dimension | Mean / median absolute error grouped by **hour of day**, **day-of-week**, **city (27 levels)**, **temperature quartile** (cold / mild / warm / hot). | Expect larger errors at **night-time lows** and in **mountain cities** (Dragash, Deçan); smaller errors in central-plain cities (Pristina, Ferizaj). |
-| 6 | **Learning curves** | MAE / R² as a function of training-set size (1k, 2.5k, 5k, 10k, 16k rows). | Curve should still be slightly descending at 16k — signal that more data would help (motivates the multi-year extension in §I). |
-| 7 | **Permutation importance** | More trustworthy than the impurity-based feature importance reported in Phase II (which over-rewards high-cardinality features). | `humidity` stays #1; cyclic time features drop a bit; `pop` confirmed negligible. |
-
-### A.8 Deliverables of A
-
-Every evaluation task above emits a named artefact to `reports/phase3_evaluation/` so the results can be audited independently:
-
-- `cv_folds.json` (5 MAE / RMSE / R² values, one per fold)
-- `chronological_metrics.json` (single-number honest evaluation)
-- `residuals.png`, `qq_plot.png`, `residuals_vs_pred.png`
-- `error_by_hour.csv`, `error_by_city.csv`, `error_by_quartile.csv`
-- `learning_curve.png`
-- `permutation_importance.png`, `permutation_importance.csv`
-
-## B. Feature Engineering & Re-training
-
-### B.1 Feature engineering candidates
-
-All new features are **computed per city on chronologically-sorted data** so that no row uses information from a future timestamp:
-
-| Feature family | Examples | Motivation | Expected MAE gain |
-|----------------|----------|-----------|-------------------|
-| **Lag features** (biggest win) | `temp_lag_1h`, `temp_lag_3h`, `temp_lag_24h`, `humidity_lag_1h`, `pressure_lag_1h` | Temperature at `t` is highly autocorrelated with recent hours — the dominant signal for short-horizon forecasting. | **−0.5 to −0.8 °C** |
-| **Rolling statistics** | 3-h / 6-h / 24-h rolling mean & std for `temperature`, `humidity`, `pressure` | Captures local trend and volatility; smooths out single-hour noise. | −0.05 to −0.15 °C |
-| **Delta features** | `pressure_delta_3h`, `humidity_delta_3h`, `temp_delta_1h` | Pressure drops often precede temperature changes — derivative signals help. | −0.05 to −0.10 °C |
-| **City encoding** | One-hot (27 dummies) **or** target encoding of `city` | The current model has no notion of location — Pristina and Dragash look identical to it. | −0.05 to −0.15 °C |
-| **Interaction features** | `humidity × clouds`, `wind_speed × pressure_delta` | Let trees exploit known physical couplings. | Marginal (−0.02 to −0.05 °C) |
-
-**Total expected combined gain over the chronological baseline (~1.35 °C):** MAE drop of **0.5–1.0 °C**, landing around **0.55–0.85 °C at `+1 h`** (with graceful degradation to ~2 °C at `+24 h`). Lag features alone account for most of the gain — the rest is polish.
-
-> **Leakage safeguard.** Lag features are built with `df.groupby("city").shift(k)` on chronologically-sorted data, so every lag looks only at the **past** of the same city. The first `k` rows per city become `NaN` and are dropped before training — they cannot leak test information into training.
-
-### B.2 Hyperparameter search grid
-
-GridSearchCV or RandomizedSearchCV with **5-fold CV** over the following space:
-
-| Hyperparameter | Candidate values |
-|----------------|------------------|
-| `n_estimators` | 100, 300, 500 |
-| `max_depth` | `None`, 10, 20, 30 |
-| `min_samples_leaf` | 1, 2, 5, 10 |
-| `min_samples_split` | 2, 5, 10 |
-| `max_features` | `sqrt`, `log2`, 0.5 |
-
-Scoring: **negative MAE** (primary) and **R²** (secondary). The combination with the best CV MAE that also keeps the train-test gap < 0.05 R² is the winning configuration.
-
-## C. Comparison Protocol
-
-### C.1 Reference baselines
-
-Every Phase III model is compared not only to the Phase II Random Forest but also to three trivial baselines — this proves the Random Forest is learning real signal, not just memorising obvious patterns:
-
-| Baseline | Definition |
-|----------|------------|
-| **Global mean** | Predict the overall mean temperature for every row. |
-| **Per-city mean** | Predict the mean temperature of the corresponding city. |
-| **Persistence** | Predict `temp[t] = temp[t−1h]` — the naive "tomorrow is like today" forecaster. |
-| **Linear Regression** | Same features as Random Forest, fitted with OLS — tests whether a non-linear model is really needed. |
-
-### C.2 Final comparison table — expected trajectory
-
-All rows below are evaluated on the **same chronological hold-out** (last ~6 days, ~4,148 rows), so the numbers are directly comparable. `expect` columns mark the target the Phase III scripts will need to hit; `TBD` columns will be overwritten once [`phase3_evaluation.py`](phase3_evaluation.py) and [`phase3_retraining.py`](phase3_retraining.py) are executed.
-
-| Model | MAE (°C) | RMSE (°C) | R² (test) | Train-test gap | Notes |
-|-------|---------:|----------:|----------:|---------------:|-------|
-| Global mean                         | expect ≈ 4.0 | expect ≈ 5.0 | expect ≈ 0.00 | — | sanity floor |
-| Per-city mean                       | expect ≈ 3.8 | expect ≈ 4.7 | expect ≈ 0.05 | — | sanity floor |
-| Persistence (1 h)                   | expect ≈ 0.7 | expect ≈ 1.0 | expect ≈ 0.97 | — | hard-to-beat naive forecaster |
-| Linear Regression (10 features)     | expect ≈ 1.8 | expect ≈ 2.3 | expect ≈ 0.76 | ≈ 0.03 | linearity check |
-| **RF — Phase II, random split**     | **1.08** | **1.56** | **0.900** | **0.086** | published reference (leakage-inflated) |
-| **RF — Phase II, chronological split** | expect ≈ 1.35 | expect ≈ 1.95 | expect ≈ 0.84 | expect ≈ 0.14 | honest baseline — §A.2 |
-| RF — tuned only (B.2)               | expect ≈ 1.25 | expect ≈ 1.80 | expect ≈ 0.86 | expect ≈ 0.10 | hyperparameter tuning |
-| RF — tuned + lag features           | expect ≈ 0.70 | expect ≈ 1.00 | expect ≈ 0.95 | expect ≈ 0.05 | + B.1 lag family (biggest jump) |
-| **RF — final (tuned + all features)** | **expect ≈ 0.60** | **expect ≈ 0.85** | **expect ≈ 0.96** | **expect ≈ 0.04** | Phase III winner |
-
-**Reading the table:** every row after the chronological baseline must improve on the one above it; if the *tuned + lag* row fails to beat *tuned only* by ≥ 0.3 °C MAE, something is wrong (likely a leakage bug in how lag features were built). These sanity thresholds are part of the verification protocol — Phase III scripts will fail loudly if the gap from any intervention is smaller than expected.
-
-### C.3 Multi-horizon forecasting evaluation
-
-Because Phase III produces a true forecaster, we report the **final model's** MAE at multiple prediction horizons — not just at `+1 h`. This is the table the professor will see as the "operational" output of the project:
-
-| Horizon `h` | Expected MAE (°C) | Expected R² | Practical interpretation |
-|-------------|-------------------|-------------|--------------------------|
-| +1 h  | ≈ 0.55–0.70 | ≈ 0.96 | Excellent — trivially useful |
-| +3 h  | ≈ 0.80–1.00 | ≈ 0.93 | Very good |
-| +6 h  | ≈ 1.10–1.30 | ≈ 0.90 | Good — standard morning-forecast horizon |
-| +12 h | ≈ 1.50–1.80 | ≈ 0.85 | Usable |
-| +24 h | ≈ 2.00–2.50 | ≈ 0.75 | Degraded but still beats persistence |
-| +48 h | ≈ 3.00–3.50 | ≈ 0.60 | Stretch goal — presented as a limitation |
-
-Beyond 48 h the 31-day dataset is too short to learn reliable patterns — that horizon belongs to a multi-year + sequence-model follow-up (§I. Future Work).
