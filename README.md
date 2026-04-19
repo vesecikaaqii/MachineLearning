@@ -484,4 +484,5 @@ Phase III re-evaluates the Phase II model with a rigorous protocol, re-trains it
 - **Per-city encoding** — one-hot or target encoding so the model distinguishes Pristina from Dragash.
 - **Baseline comparison** — Random Forest vs global mean, per-city mean, 1-hour persistence, and linear regression.
 - **Multi-horizon evaluation** — report final MAE at +1 h, +3 h, +6 h, +12 h, +24 h, +48 h.
+- **Predicted vs Actual plots** — produce final scatter plot(s) comparing the model's predictions against real temperature values.
 
