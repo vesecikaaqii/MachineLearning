@@ -1,17 +1,3 @@
-"""
-Phase III — rigorous evaluation of the Phase II Random Forest baseline.
-
-Runs:
-  1. Chronological 80/20 split — honest forecasting metrics
-  2. 5-fold cross-validation — stable mean ± std of MAE / RMSE / R^2
-  3. Residual diagnostics — histogram, Q-Q plot, residuals vs predicted
-  4. Error breakdown by hour of day, city (27), and temperature quartile
-  5. Learning curve — error as a function of training-set size
-  6. Permutation importance — unbiased feature ranking
-
-Artefacts are saved to  reports/phase3_evaluation/
-"""
-
 import os
 import json
 import warnings
@@ -48,9 +34,6 @@ log("=" * 70)
 log("PHASE III  -  Rigorous Evaluation of the Phase II Baseline")
 log("=" * 70)
 
-# ---------------------------------------------------------------------------
-# Load + Phase II preprocessing (kept identical for honest comparison)
-# ---------------------------------------------------------------------------
 df = pd.read_csv(DATA_PATH)
 df["datetime"] = pd.to_datetime(df["datetime"])
 
@@ -77,9 +60,6 @@ log(f"Features ({len(FEATURES)})       : {FEATURES}")
 log(f"Target              : {TARGET} (deg C)")
 log(f"RF baseline config  : {cfg}")
 
-# ---------------------------------------------------------------------------
-# 1. Chronological 80/20 split (true forecasting metric)
-# ---------------------------------------------------------------------------
 log("\n" + "-" * 70)
 log("1. CHRONOLOGICAL SPLIT (honest forecasting evaluation)")
 log("-" * 70)
@@ -113,9 +93,6 @@ log(f"R^2  (train)   : {r2_tr_c:.4f}")
 log(f"R^2  (test)    : {r2_c:.4f}")
 log(f"Train-test gap : {r2_tr_c - r2_c:.4f}")
 
-# ---------------------------------------------------------------------------
-# 2. 5-fold cross-validation
-# ---------------------------------------------------------------------------
 log("\n" + "-" * 70)
 log("2. 5-FOLD CROSS-VALIDATION")
 log("-" * 70)
@@ -147,16 +124,12 @@ cv_r2_std = np.std([f["R2"] for f in fold_metrics])
 
 log(f"  CV mean  : MAE={cv_mae:.3f} (+/- {cv_mae_std:.3f})  RMSE={cv_rmse:.3f}  R^2={cv_r2:.4f} (+/- {cv_r2_std:.4f})")
 
-# ---------------------------------------------------------------------------
-# 3. Residual diagnostics (on chronological hold-out)
-# ---------------------------------------------------------------------------
 log("\n" + "-" * 70)
 log("3. RESIDUAL DIAGNOSTICS")
 log("-" * 70)
 
 residuals = y_test_c - pred_c
 
-# Histogram of residuals
 plt.figure(figsize=(7, 5))
 plt.hist(residuals, bins=60, color="steelblue", edgecolor="white")
 plt.axvline(0, color="black", linestyle="--", lw=1)
@@ -167,7 +140,6 @@ plt.tight_layout()
 plt.savefig(os.path.join(REPORTS_DIR, "residuals.png"), dpi=150)
 plt.close()
 
-# Q-Q plot
 plt.figure(figsize=(6, 6))
 stats.probplot(residuals, dist="norm", plot=plt)
 plt.title("Phase III - Q-Q plot of residuals")
@@ -175,7 +147,6 @@ plt.tight_layout()
 plt.savefig(os.path.join(REPORTS_DIR, "qq_plot.png"), dpi=150)
 plt.close()
 
-# Residuals vs predicted
 plt.figure(figsize=(7, 5))
 plt.scatter(pred_c, residuals, alpha=0.4, s=10, color="steelblue")
 plt.axhline(0, color="black", linestyle="--", lw=1)
@@ -190,9 +161,6 @@ log(f"Residual mean   : {residuals.mean():.4f}")
 log(f"Residual std    : {residuals.std():.4f}")
 log(f"Residual min/max: {residuals.min():.3f} / {residuals.max():.3f}")
 
-# ---------------------------------------------------------------------------
-# 4. Error breakdown (hour / city / temperature quartile)
-# ---------------------------------------------------------------------------
 log("\n" + "-" * 70)
 log("4. ERROR BREAKDOWN BY DIMENSION")
 log("-" * 70)
@@ -201,7 +169,6 @@ err_df = test_df.copy()
 err_df["pred"] = pred_c
 err_df["abs_err"] = np.abs(err_df[TARGET] - err_df["pred"])
 
-# By hour of day
 hour_err = err_df.groupby("hour")["abs_err"].agg(["mean", "median", "count"]).round(3)
 hour_err.to_csv(os.path.join(REPORTS_DIR, "error_by_hour.csv"))
 
@@ -214,7 +181,6 @@ plt.tight_layout()
 plt.savefig(os.path.join(REPORTS_DIR, "error_by_hour.png"), dpi=150)
 plt.close()
 
-# By city
 city_err = err_df.groupby("city")["abs_err"].agg(["mean", "median", "count"]).round(3).sort_values("mean")
 city_err.to_csv(os.path.join(REPORTS_DIR, "error_by_city.csv"))
 
@@ -226,7 +192,6 @@ plt.tight_layout()
 plt.savefig(os.path.join(REPORTS_DIR, "error_by_city.png"), dpi=150)
 plt.close()
 
-# By temperature quartile
 err_df["temp_quartile"] = pd.qcut(err_df[TARGET], 4, labels=["Q1 (cold)", "Q2", "Q3", "Q4 (warm)"])
 quartile_err = err_df.groupby("temp_quartile", observed=True)["abs_err"].agg(["mean", "median", "count"]).round(3)
 quartile_err.to_csv(os.path.join(REPORTS_DIR, "error_by_quartile.csv"))
@@ -238,9 +203,6 @@ log(city_err.sort_values("mean", ascending=False).head(3).to_string())
 log("\nError by temperature quartile:")
 log(quartile_err.to_string())
 
-# ---------------------------------------------------------------------------
-# 5. Learning curve
-# ---------------------------------------------------------------------------
 log("\n" + "-" * 70)
 log("5. LEARNING CURVE")
 log("-" * 70)
@@ -273,9 +235,6 @@ plt.close()
 log(f"Learning-curve sizes : {lc_sizes.tolist()}")
 log(f"CV MAE at each size  : {[round(v, 3) for v in lc_val_mae]}")
 
-# ---------------------------------------------------------------------------
-# 6. Permutation importance
-# ---------------------------------------------------------------------------
 log("\n" + "-" * 70)
 log("6. PERMUTATION IMPORTANCE (on chronological test set)")
 log("-" * 70)
@@ -304,9 +263,6 @@ plt.close()
 
 log(perm_df.to_string(index=False))
 
-# ---------------------------------------------------------------------------
-# Persist machine-readable summary
-# ---------------------------------------------------------------------------
 summary = {
     "phase": "III - Evaluation",
     "rows_used": int(len(df)),

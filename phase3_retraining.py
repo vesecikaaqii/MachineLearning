@@ -1,25 +1,3 @@
-"""
-Phase III - Re-training of the Random Forest with feature engineering,
-hyperparameter tuning, baseline comparison, and multi-horizon evaluation.
-
-Pipeline:
-  1. Load + Phase II preprocessing (cyclic time, NaN safety)
-  2. Build new features per city (chronologically safe):
-       - Lag features (1h, 3h, 24h) of temperature/humidity/pressure
-       - Rolling means (3h, 24h) of temperature/humidity
-       - Delta features (3h pressure/humidity change)
-       - Physical interactions
-       - One-hot encoding of city (27 dummies)
-  3. Chronological 80/20 split on datetime
-  4. Reference baselines (global mean, per-city mean, 1-h persistence)
-  5. GridSearchCV with TimeSeriesSplit -> best Random Forest configuration
-  6. Multi-horizon forecasting (+1h ... +48h) using best params
-  7. Predicted-vs-Actual scatter + horizon-degradation plot
-  8. Save model + JSON summary + log
-
-Artefacts -> reports/phase3_retraining/  and  models/rf_model_v2.pkl
-"""
-
 import os
 import json
 import warnings
@@ -56,9 +34,6 @@ log("=" * 70)
 log("PHASE III  -  Re-training (feature engineering + hyperparameter tuning)")
 log("=" * 70)
 
-# ---------------------------------------------------------------------------
-# 1. Load + Phase II preprocessing
-# ---------------------------------------------------------------------------
 df = pd.read_csv(DATA_PATH)
 df["datetime"] = pd.to_datetime(df["datetime"])
 df = df.sort_values(["city", "datetime"]).reset_index(drop=True)
@@ -73,9 +48,6 @@ df["month_cos"] = np.cos(2 * np.pi * df["month"] / 12.0)
 
 log(f"Loaded rows : {len(df)}")
 
-# ---------------------------------------------------------------------------
-# 2. Feature engineering (leakage-safe: groupby city, shift only into past)
-# ---------------------------------------------------------------------------
 log("\n" + "-" * 70)
 log("2. FEATURE ENGINEERING (lag / rolling / delta / interaction / city OHE)")
 log("-" * 70)
@@ -84,29 +56,24 @@ g_temp = df.groupby("city")["temperature_2m"]
 g_hum  = df.groupby("city")["relative_humidity_2m"]
 g_pre  = df.groupby("city")["surface_pressure"]
 
-# Lag features
 df["temp_lag_1h"]     = g_temp.shift(1)
 df["temp_lag_3h"]     = g_temp.shift(3)
 df["temp_lag_24h"]    = g_temp.shift(24)
 df["humidity_lag_1h"] = g_hum.shift(1)
 df["pressure_lag_1h"] = g_pre.shift(1)
 
-# Rolling means/std (shift by 1 first so current value is excluded)
 df["temp_roll_3h_mean"]  = g_temp.shift(1).groupby(df["city"]).rolling(3).mean().reset_index(level=0, drop=True)
 df["temp_roll_24h_mean"] = g_temp.shift(1).groupby(df["city"]).rolling(24).mean().reset_index(level=0, drop=True)
 df["hum_roll_3h_mean"]   = g_hum.shift(1).groupby(df["city"]).rolling(3).mean().reset_index(level=0, drop=True)
 df["pre_roll_3h_mean"]   = g_pre.shift(1).groupby(df["city"]).rolling(3).mean().reset_index(level=0, drop=True)
 
-# Delta features (change over 3 hours, using lag-1 to lag-4)
 df["pressure_delta_3h"] = g_pre.shift(1) - g_pre.shift(4)
 df["humidity_delta_3h"] = g_hum.shift(1) - g_hum.shift(4)
 df["temp_delta_1h"]     = g_temp.shift(1) - g_temp.shift(2)
 
-# Interaction features
 df["hum_x_clouds"]      = df["relative_humidity_2m"] * df["cloud_cover"]
 df["wind_x_pre_delta"]  = df["wind_speed_10m"] * df["pressure_delta_3h"]
 
-# Per-city one-hot encoding
 city_ohe = pd.get_dummies(df["city"], prefix="city", dtype=int)
 df = pd.concat([df, city_ohe], axis=1)
 
@@ -132,13 +99,9 @@ log(f"New engineered feats : {len(LAG_FEATURES)}")
 log(f"City one-hot dummies : {len(CITY_FEATURES)}")
 log(f"Total features       : {len(ALL_FEATURES)}")
 
-# Drop rows where lag/rolling features are NaN (first 24 rows per city)
 df = df.dropna(subset=LAG_FEATURES).reset_index(drop=True)
 log(f"Rows after dropping lag-NaN : {len(df)}")
 
-# ---------------------------------------------------------------------------
-# 3. Chronological 80/20 split (true forecasting setup)
-# ---------------------------------------------------------------------------
 log("\n" + "-" * 70)
 log("3. CHRONOLOGICAL SPLIT")
 log("-" * 70)
@@ -156,27 +119,21 @@ y_test  = test_df[TARGET].values
 log(f"Train period : {train_df['datetime'].min()} -> {train_df['datetime'].max()}  ({len(train_df)} rows)")
 log(f"Test  period : {test_df['datetime'].min()}  -> {test_df['datetime'].max()}   ({len(test_df)} rows)")
 
-# ---------------------------------------------------------------------------
-# 4. Reference baselines
-# ---------------------------------------------------------------------------
 log("\n" + "-" * 70)
 log("4. REFERENCE BASELINES (on chronological test set)")
 log("-" * 70)
 
-# Global mean baseline
 gm_pred  = np.full(len(y_test), y_train.mean())
 gm_mae   = mean_absolute_error(y_test, gm_pred)
 gm_rmse  = np.sqrt(mean_squared_error(y_test, gm_pred))
 gm_r2    = r2_score(y_test, gm_pred)
 
-# Per-city mean baseline
 city_means = train_df.groupby("city")[TARGET].mean()
 pc_pred = test_df["city"].map(city_means).values
 pc_mae  = mean_absolute_error(y_test, pc_pred)
 pc_rmse = np.sqrt(mean_squared_error(y_test, pc_pred))
 pc_r2   = r2_score(y_test, pc_pred)
 
-# 1-hour persistence (temp_lag_1h is yesterday's-hour ahead of current target)
 persist_pred = test_df["temp_lag_1h"].values
 persist_mae  = mean_absolute_error(y_test, persist_pred)
 persist_rmse = np.sqrt(mean_squared_error(y_test, persist_pred))
@@ -186,9 +143,6 @@ log(f"Global mean      : MAE={gm_mae:.3f}  RMSE={gm_rmse:.3f}  R^2={gm_r2:.4f}")
 log(f"Per-city mean    : MAE={pc_mae:.3f}  RMSE={pc_rmse:.3f}  R^2={pc_r2:.4f}")
 log(f"1-h persistence  : MAE={persist_mae:.3f}  RMSE={persist_rmse:.3f}  R^2={persist_r2:.4f}")
 
-# ---------------------------------------------------------------------------
-# 5. Hyperparameter tuning (GridSearchCV with TimeSeriesSplit)
-# ---------------------------------------------------------------------------
 log("\n" + "-" * 70)
 log("5. GRIDSEARCHCV (TimeSeriesSplit, MAE scoring)")
 log("-" * 70)
@@ -227,12 +181,8 @@ final_r2_tr = r2_score(y_train, best_model.predict(X_train))
 
 log(f"Final test  : MAE={final_mae:.3f}  RMSE={final_rmse:.3f}  R^2={final_r2:.4f}  (train R^2={final_r2_tr:.4f}, gap={final_r2_tr-final_r2:.4f})")
 
-# Save final model
 joblib.dump(best_model, os.path.join(MODELS_DIR, "rf_model_v2.pkl"))
 
-# ---------------------------------------------------------------------------
-# 6. Multi-horizon evaluation
-# ---------------------------------------------------------------------------
 log("\n" + "-" * 70)
 log("6. MULTI-HORIZON FORECASTING")
 log("-" * 70)
@@ -240,14 +190,12 @@ log("-" * 70)
 HORIZONS = [1, 3, 6, 12, 24, 48]
 horizon_results = {}
 
-# Re-sort by (city, datetime) to build forward targets safely
 df_h = df.sort_values(["city", "datetime"]).reset_index(drop=True)
 g_target = df_h.groupby("city")["temperature_2m"]
 
 for h in HORIZONS:
     df_h[f"target_t+{h}"] = g_target.shift(-h)
 
-# Re-do the chronological split using same cutoff
 df_h_sorted = df_h.sort_values("datetime").reset_index(drop=True)
 cutoff_h = df_h_sorted["datetime"].quantile(0.80)
 
@@ -278,14 +226,10 @@ for h in HORIZONS:
                               train_size=int(len(tr)), test_size=int(len(te)))
     log(f"  h=+{h:>2}h : MAE={h_mae:.3f}  RMSE={h_rmse:.3f}  R^2={h_r2:.4f}")
 
-# ---------------------------------------------------------------------------
-# 7. Plots
-# ---------------------------------------------------------------------------
 log("\n" + "-" * 70)
 log("7. PLOTS")
 log("-" * 70)
 
-# Predicted vs Actual
 plt.figure(figsize=(7, 7))
 plt.scatter(y_test, pred_final, alpha=0.45, s=10, color="steelblue", label="predictions")
 lo, hi = float(y_test.min()), float(y_test.max())
@@ -298,7 +242,6 @@ plt.tight_layout()
 plt.savefig(os.path.join(REPORTS_DIR, "phase3_pred_vs_true.png"), dpi=150)
 plt.close()
 
-# Multi-horizon MAE curve
 if horizon_results:
     hs   = sorted(horizon_results.keys())
     maes = [horizon_results[h]["MAE"] for h in hs]
@@ -312,7 +255,6 @@ if horizon_results:
     plt.savefig(os.path.join(REPORTS_DIR, "phase3_multihorizon.png"), dpi=150)
     plt.close()
 
-# Comparison bar chart (baselines vs final)
 labels = ["Global\nmean", "Per-city\nmean", "1-h\npersistence", "Phase III\nfinal RF"]
 maes   = [gm_mae, pc_mae, persist_mae, final_mae]
 plt.figure(figsize=(8, 5))
@@ -325,7 +267,6 @@ plt.tight_layout()
 plt.savefig(os.path.join(REPORTS_DIR, "phase3_baselines.png"), dpi=150)
 plt.close()
 
-# Feature importance (impurity-based, for quick visual)
 imp = pd.Series(best_model.feature_importances_, index=ALL_FEATURES).sort_values(ascending=False)
 top20 = imp.head(20)
 plt.figure(figsize=(8, 8))
@@ -339,9 +280,6 @@ plt.close()
 log("Top-10 features:")
 log(imp.head(10).to_string())
 
-# ---------------------------------------------------------------------------
-# 8. Persist summary
-# ---------------------------------------------------------------------------
 summary = {
     "phase": "III - Re-training",
     "rows_used": int(len(df)),
