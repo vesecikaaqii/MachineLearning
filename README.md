@@ -607,13 +607,4 @@ Phase III re-evaluates the Phase II model with a rigorous protocol, **re-trains 
 - **Citizens and small businesses** — a transparent open-data alternative to commercial weather apps.
 - **Researchers and students** — a clean Kosovo dataset and baseline ready to extend (multi-year, sequence models, deployment).
 
-## Future work and improvements
-
-- Multi-year archive pulls to capture full seasonal cycles (winter–summer transitions).
-- LSTM / GRU sequence models for multi-step-ahead forecasts beyond 48 h.
-- Per-city dedicated models or hierarchical models with shared base + per-city heads.
-- Multi-target prediction (temperature + humidity + precipitation jointly).
-- Probabilistic forecasts (quantile forests, conformal prediction) for calibrated confidence intervals.
-- Real-time serving via a FastAPI / Flask endpoint with a lightweight dashboard.
-- Comparison against commercial APIs (AccuWeather, OpenWeatherMap) to measure the local-tuning advantage.
 
