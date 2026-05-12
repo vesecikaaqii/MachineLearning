@@ -84,20 +84,15 @@ source .venv/bin/activate         # Linux / macOS / Git-Bash on Windows
 # or
 .venv\Scripts\activate            # PowerShell
 
-# 3. Install dependencies
 pip install pandas numpy matplotlib seaborn scikit-learn joblib requests
 
-# 4. Re-collect data from Open-Meteo (no API key required)
 
 python weather_data_scraper.py
 
-# 5. Run the Phase II training
 python phase2_model_training.py
 
-# 6. Run the Phase III evaluation (rigorous diagnostics on the Phase II model)
 python phase3_evaluation.py
 
-# 7. Run the Phase III re-training (feature engineering + tuning + multi-horizon)
 python phase3_retraining.py
 ```
 
@@ -105,8 +100,8 @@ python phase3_retraining.py
 
 ```
 models/
-├── rf_model.pkl              # Phase II baseline
-├── rf_model_v2.pkl           # Phase III tuned + engineered features
+├── rf_model.pkl             
+├── rf_model_v2.pkl           
 └── scaler_phase2.pkl
 
 reports/
@@ -500,8 +495,6 @@ Phase III re-evaluates the Phase II model with a rigorous protocol, **re-trains 
 - Re-training script : [`phase3_retraining.py`](phase3_retraining.py) → artefacts in [`reports/phase3_retraining/`](reports/phase3_retraining/)
 - Final model        : [`models/rf_model_v2.pkl`](models/rf_model_v2.pkl)
 
-## Main points we will do
-
 ### Analysis & Evaluation
 
 - **Chronological split** — train on the first ~25 days, hold out the last ~6 days. Removes the temporal leakage of the random 80/20 split used in Phase II.
@@ -510,7 +503,7 @@ Phase III re-evaluates the Phase II model with a rigorous protocol, **re-trains 
 - **Learning curves** — MAE / R² vs training-set size to check whether more data would still help.
 - **Permutation importance** — replaces the impurity-based ranking, which over-rewards high-cardinality features.
 
-### Re-training (same Random Forest, no new algorithm)
+### Re-training 
 
 - **Hyperparameter tuning** — GridSearchCV over `n_estimators`, `max_depth`, `min_samples_leaf`, `min_samples_split`, `max_features`.
 - **Lag features** (biggest win) — 1-hour, 3-hour, and 24-hour lags of `temperature_2m`, `relative_humidity_2m`, and `surface_pressure`, built per city on chronologically-sorted data.
