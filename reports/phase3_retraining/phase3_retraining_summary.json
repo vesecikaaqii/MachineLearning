@@ -1,0 +1,153 @@
+{
+  "phase": "III - Re-training",
+  "rows_used": 20088,
+  "train_size": 16065,
+  "test_size": 4023,
+  "features": {
+    "base": [
+      "relative_humidity_2m",
+      "surface_pressure",
+      "wind_speed_10m",
+      "wind_direction_10m",
+      "cloud_cover",
+      "precipitation",
+      "hour_sin",
+      "hour_cos",
+      "month_sin",
+      "month_cos"
+    ],
+    "engineered": [
+      "temp_lag_1h",
+      "temp_lag_3h",
+      "temp_lag_24h",
+      "humidity_lag_1h",
+      "pressure_lag_1h",
+      "temp_roll_3h_mean",
+      "temp_roll_24h_mean",
+      "hum_roll_3h_mean",
+      "pre_roll_3h_mean",
+      "pressure_delta_3h",
+      "humidity_delta_3h",
+      "temp_delta_1h",
+      "hum_x_clouds",
+      "wind_x_pre_delta"
+    ],
+    "city_ohe": [
+      "city_Decan",
+      "city_Dragash",
+      "city_Drenas",
+      "city_Ferizaj",
+      "city_Fushe Kosova",
+      "city_Gjakova",
+      "city_Gjilan",
+      "city_Hani i Elezit",
+      "city_Istog",
+      "city_Kamenica",
+      "city_Kline",
+      "city_Lipjan",
+      "city_Malisheva",
+      "city_Mitrovica",
+      "city_Novoberde",
+      "city_Obiliq",
+      "city_Peja",
+      "city_Podujeva",
+      "city_Pristina",
+      "city_Prizren",
+      "city_Rahovec",
+      "city_Shtime",
+      "city_Skenderaj",
+      "city_Suhareka",
+      "city_Vushtrri",
+      "city_Zubin Potok",
+      "city_Zvecan"
+    ],
+    "total_count": 51
+  },
+  "target": "temperature_2m",
+  "best_params": {
+    "max_depth": null,
+    "min_samples_leaf": 1,
+    "n_estimators": 300
+  },
+  "best_cv_mae": 0.4926355135015494,
+  "baselines": {
+    "global_mean": {
+      "MAE": 4.140948537505979,
+      "RMSE": 5.4013287337946885,
+      "R2": -0.7343607796269915
+    },
+    "per_city_mean": {
+      "MAE": 4.084457478740937,
+      "RMSE": 5.356882718495426,
+      "R2": -0.7059350820317369
+    },
+    "persistence_1h": {
+      "MAE": 0.9339299030574197,
+      "RMSE": 1.2031051878225147,
+      "R2": 0.9139510801731858
+    }
+  },
+  "phase3_final": {
+    "MAE": 0.5005093214019395,
+    "RMSE": 0.6558128170371029,
+    "R2_train": 0.9989089294801617,
+    "R2_test": 0.9744319254263107,
+    "train_test_gap": 0.024477004053851004
+  },
+  "multi_horizon": {
+    "1": {
+      "MAE": 0.8302571738405076,
+      "RMSE": 1.070596719112226,
+      "R2": 0.9321906542227568,
+      "train_size": 16065,
+      "test_size": 3996
+    },
+    "3": {
+      "MAE": 1.336364704887536,
+      "RMSE": 1.6850008451007688,
+      "R2": 0.8336816053851007,
+      "train_size": 16065,
+      "test_size": 3942
+    },
+    "6": {
+      "MAE": 1.8856796166796181,
+      "RMSE": 2.3812418224946463,
+      "R2": 0.6680497433935513,
+      "train_size": 16065,
+      "test_size": 3861
+    },
+    "12": {
+      "MAE": 2.2522737676849607,
+      "RMSE": 2.832516876613006,
+      "R2": 0.48955787967053,
+      "train_size": 16065,
+      "test_size": 3699
+    },
+    "24": {
+      "MAE": 3.2000361481481483,
+      "RMSE": 4.065639343405931,
+      "R2": -0.23511841834192704,
+      "train_size": 16065,
+      "test_size": 3375
+    },
+    "48": {
+      "MAE": 2.445757120156461,
+      "RMSE": 3.0881324414737787,
+      "R2": 0.059382409807386405,
+      "train_size": 16065,
+      "test_size": 2727
+    }
+  },
+  "top10_feature_importance": {
+    "temp_lag_1h": 0.9401796663997102,
+    "hour_cos": 0.033676697600057585,
+    "temp_delta_1h": 0.006404184462900815,
+    "hour_sin": 0.002434376463307584,
+    "hum_x_clouds": 0.002303878948861157,
+    "relative_humidity_2m": 0.0021949195846743055,
+    "temp_roll_24h_mean": 0.0013585681742290666,
+    "wind_x_pre_delta": 0.0011919570919870692,
+    "wind_speed_10m": 0.0011758201892671447,
+    "pressure_delta_3h": 0.0011560231965203056
+  }
+}

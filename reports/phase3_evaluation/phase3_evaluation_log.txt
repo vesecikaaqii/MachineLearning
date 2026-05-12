@@ -1,0 +1,82 @@
+======================================================================
+PHASE III  -  Rigorous Evaluation of the Phase II Baseline
+======================================================================
+Rows after cleaning : 20736
+Features (10)       : ['relative_humidity_2m', 'surface_pressure', 'wind_speed_10m', 'wind_direction_10m', 'cloud_cover', 'precipitation', 'hour_sin', 'hour_cos', 'month_sin', 'month_cos']
+Target              : temperature_2m (deg C)
+RF baseline config  : {'n_estimators': 100, 'max_depth': None, 'min_samples_leaf': 1, 'random_state': 42, 'n_jobs': -1}
+
+----------------------------------------------------------------------
+1. CHRONOLOGICAL SPLIT (honest forecasting evaluation)
+----------------------------------------------------------------------
+Train period   : 2026-04-09 00:00:00 -> 2026-05-04 13:00:00
+Test  period   : 2026-05-04 14:00:00 -> 2026-05-10 23:00:00
+Split sizes    : 16578 / 4158
+MAE  (test)    : 6.335 C
+RMSE (test)    : 6.671 C
+R^2  (train)   : 0.9779
+R^2  (test)    : -1.6007
+Train-test gap : 2.5786
+
+----------------------------------------------------------------------
+2. 5-FOLD CROSS-VALIDATION
+----------------------------------------------------------------------
+  Fold 1: MAE=1.478  RMSE=2.032  R^2=0.8447
+  Fold 2: MAE=1.488  RMSE=2.064  R^2=0.8420
+  Fold 3: MAE=1.560  RMSE=2.169  R^2=0.8234
+  Fold 4: MAE=1.471  RMSE=2.030  R^2=0.8469
+  Fold 5: MAE=1.484  RMSE=2.046  R^2=0.8451
+  CV mean  : MAE=1.496 (+/- 0.032)  RMSE=2.068  R^2=0.8404 (+/- 0.0087)
+
+----------------------------------------------------------------------
+3. RESIDUAL DIAGNOSTICS
+----------------------------------------------------------------------
+Residual mean   : 6.3347
+Residual std    : 2.0928
+Residual min/max: 0.818 / 12.472
+
+----------------------------------------------------------------------
+4. ERROR BREAKDOWN BY DIMENSION
+----------------------------------------------------------------------
+Error by hour (top 3 worst hours):
+       mean  median  count
+hour                      
+19    7.969   8.004    189
+20    7.408   7.732    189
+21    7.159   7.453    189
+
+Error by city (top 3 worst cities):
+                mean  median  count
+city                               
+Hani i Elezit  7.209   6.989    154
+Gjakova        7.044   7.138    154
+Suhareka       6.877   6.903    154
+
+Error by temperature quartile:
+                mean  median  count
+temp_quartile                      
+Q1 (cold)      4.889   4.708   1081
+Q2             6.335   6.219   1028
+Q3             7.373   7.611   1027
+Q4 (warm)      6.820   7.045   1022
+
+----------------------------------------------------------------------
+5. LEARNING CURVE
+----------------------------------------------------------------------
+Learning-curve sizes : [1382, 3870, 6359, 8847, 11335, 13824]
+CV MAE at each size  : [np.float64(3.23), np.float64(2.265), np.float64(1.956), np.float64(1.903), np.float64(1.804), np.float64(1.737)]
+
+----------------------------------------------------------------------
+6. PERMUTATION IMPORTANCE (on chronological test set)
+----------------------------------------------------------------------
+             feature  importance_mean  importance_std
+relative_humidity_2m     4.631415e-01    2.727940e-02
+            hour_sin     2.673557e-01    1.381113e-02
+            hour_cos     2.025762e-01    1.280610e-02
+       precipitation     3.100491e-02    3.413077e-03
+  wind_direction_10m     1.397201e-02    4.239027e-03
+         cloud_cover     6.480616e-03    1.459081e-02
+           month_sin     8.881784e-17    2.664535e-16
+           month_cos     0.000000e+00    0.000000e+00
+    surface_pressure    -1.260519e-02    6.065821e-03
+      wind_speed_10m    -7.526585e-02    3.026671e-03
