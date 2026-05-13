@@ -389,8 +389,6 @@ The points cluster tightly along the ideal diagonal (dashed line) — the model 
 
 # PHASE III — Analysis and Evaluation
 
-Phase III re-evaluates the Phase II model with a rigorous protocol, **re-trains the same Random Forest Regressor** with tuned hyperparameters and new features, and turns it into a true short-horizon forecaster (1–24 h ahead). The dataset stays as is (20,736 rows, ~31 days), and **no new algorithm is introduced** — the project remains a single-algorithm Random Forest study, as required by the course brief. Every improvement in Phase III comes from re-training the same model with better hyperparameters, richer features, or a stricter evaluation protocol.
-
 **Status:** **executed**.
 
 - Evaluation script  : [`phase3_evaluation.py`](phase3_evaluation.py) → artefacts in [`reports/phase3_evaluation/`](reports/phase3_evaluation/)
@@ -412,11 +410,6 @@ Phase III re-evaluates the Phase II model with a rigorous protocol, **re-trains 
 - **Rolling / delta / interaction features** — 3 h / 24 h rolling mean & std of `temperature_2m`, `relative_humidity_2m`, `surface_pressure`; short-term deltas of pressure and humidity; physical interactions such as `relative_humidity_2m × cloud_cover`.
 - **Per-city encoding** — one-hot or target encoding so the model distinguishes Pristina from Dragash.
 
-### Comparison & Visualisation
-
-- **Baseline comparison** — the retrained Random Forest is compared against three trivial sanity baselines (global mean, per-city mean, 1-hour persistence) — these are reference predictors, not alternative algorithms.
-- **Multi-horizon evaluation** — report final MAE at +1 h, +3 h, +6 h, +12 h, +24 h, +48 h.
-- **Predicted vs Actual plots** — produce final scatter plot(s) comparing the model's predictions against real temperature values.
 
 ## ML tools applied
 
