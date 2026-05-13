@@ -1,0 +1,40 @@
+======================================================================
+PHASE II  -  Model Training  (Multiple Algorithms)
+======================================================================
+Rows after cleaning : 20736
+Features (10)       : ['relative_humidity_2m', 'surface_pressure', 'wind_speed_10m', 'wind_direction_10m', 'cloud_cover', 'precipitation', 'hour_sin', 'hour_cos', 'month_sin', 'month_cos']
+Target              : temperature_2m (deg C)
+
+Strongest absolute correlations with temperature:
+relative_humidity_2m    0.641404
+wind_speed_10m          0.288712
+surface_pressure        0.137011
+precipitation           0.085322
+cloud_cover             0.039377
+
+Train / Test split  : 16588 / 4148  (80% / 20%)
+
+----------------------------------------------------------------------
+TRAINING MULTIPLE MODELS
+----------------------------------------------------------------------
+
+--> Training RandomForest...
+Training results:
+  MAE         : 1.383 C
+  RMSE        : 1.943 C
+  R^2 (train) : 0.9801
+  R^2 (test)  : 0.8609
+
+--> Training GradientBoosting...
+Training results:
+  MAE         : 1.799 C
+  RMSE        : 2.285 C
+  R^2 (train) : 0.8341
+  R^2 (test)  : 0.8076
+
+--> Training LinearRegression...
+Training results:
+  MAE         : 2.694 C
+  RMSE        : 3.256 C
+  R^2 (train) : 0.6011
+  R^2 (test)  : 0.6094

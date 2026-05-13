@@ -1,6 +1,10 @@
 {
   "phase": "II - Model Training",
-  "algorithm": "RandomForestRegressor",
+  "algorithms": [
+    "RandomForest",
+    "GradientBoosting",
+    "LinearRegression"
+  ],
   "rows_used": 20736,
   "train_size": 16588,
   "test_size": 4148,
@@ -17,29 +21,62 @@
     "month_cos"
   ],
   "target": "temperature_2m",
-  "config": {
-    "n_estimators": 100,
-    "max_depth": null,
-    "min_samples_leaf": 1,
-    "random_state": 42,
-    "n_jobs": -1
-  },
   "metrics": {
-    "MAE": 1.0411559787849567,
-    "RMSE": 1.4782447576108804,
-    "R2_train": 0.9863106092563392,
-    "R2_test": 0.9068625635924475
+    "RandomForest": {
+      "MAE": 1.3834727579556412,
+      "RMSE": 1.9431093674164515,
+      "R2_train": 0.980081689796847,
+      "R2_test": 0.8608902560001545
+    },
+    "GradientBoosting": {
+      "MAE": 1.7992360875086766,
+      "RMSE": 2.285083208389982,
+      "R2_train": 0.8341008847556439,
+      "R2_test": 0.8076168202995884
+    },
+    "LinearRegression": {
+      "MAE": 2.6940539544368365,
+      "RMSE": 3.2560354315375415,
+      "R2_train": 0.6010507801489953,
+      "R2_test": 0.609391846174367
+    }
   },
-  "feature_importance": {
-    "relative_humidity_2m": 0.4681583791509601,
-    "month_cos": 0.10061622549147747,
-    "month_sin": 0.08665079525024162,
-    "surface_pressure": 0.07088102616843855,
-    "hour_cos": 0.06590506427969556,
-    "hour_sin": 0.06278608208619586,
-    "wind_direction_10m": 0.050158469362579026,
-    "cloud_cover": 0.04922979175695804,
-    "wind_speed_10m": 0.040644070005349024,
-    "precipitation": 0.0049700964481048816
+  "feature_importances": {
+    "RandomForest": {
+      "relative_humidity_2m": 0.4245328797386845,
+      "hour_cos": 0.13243961371622498,
+      "hour_sin": 0.10085271845960005,
+      "wind_direction_10m": 0.096365052709282,
+      "surface_pressure": 0.06642186567473334,
+      "cloud_cover": 0.05784169843179532,
+      "wind_speed_10m": 0.05760788796484054,
+      "month_sin": 0.030405447372034242,
+      "month_cos": 0.029114898200689084,
+      "precipitation": 0.004417937732116077
+    },
+    "GradientBoosting": {
+      "relative_humidity_2m": 0.47488937729299424,
+      "hour_cos": 0.13980609958732643,
+      "hour_sin": 0.11216042648759755,
+      "wind_direction_10m": 0.07527512620615254,
+      "cloud_cover": 0.04868496871431061,
+      "month_cos": 0.04407004303839941,
+      "surface_pressure": 0.043071426233606436,
+      "month_sin": 0.03151811396030552,
+      "wind_speed_10m": 0.027590614992503648,
+      "precipitation": 0.0029338034868038503
+    },
+    "LinearRegression": {
+      "hour_sin": 1.9016553135734273,
+      "relative_humidity_2m": 1.8647718112608829,
+      "hour_cos": 1.705587945682519,
+      "surface_pressure": 0.5718465724603312,
+      "cloud_cover": 0.5547210570519787,
+      "wind_direction_10m": 0.41003681354970767,
+      "month_cos": 0.2790866856673643,
+      "month_sin": 0.2790866856673293,
+      "wind_speed_10m": 0.23513647257450576,
+      "precipitation": 0.1032402315267148
+    }
   }
 }
