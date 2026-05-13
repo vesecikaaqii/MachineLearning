@@ -9,8 +9,12 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import seaborn as sns
 import joblib
+
 from sklearn.model_selection import GridSearchCV, TimeSeriesSplit
-from sklearn.ensemble import RandomForestRegressor
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+from sklearn.linear_model import LinearRegression
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 warnings.filterwarnings("ignore")
@@ -30,7 +34,7 @@ def log(msg=""):
     log_lines.append(str(msg))
 
 log("=" * 70)
-log("PHASE III  -  Re-training (feature engineering + hyperparameter tuning)")
+log("PHASE III  -  Re-training (feature eng + tuning for multiple models)")
 log("=" * 70)
 
 df = pd.read_csv(DATA_PATH)
@@ -93,13 +97,7 @@ CITY_FEATURES = list(city_ohe.columns)
 ALL_FEATURES = BASE_FEATURES + LAG_FEATURES + CITY_FEATURES
 TARGET = "temperature_2m"
 
-log(f"Base features        : {len(BASE_FEATURES)}")
-log(f"New engineered feats : {len(LAG_FEATURES)}")
-log(f"City one-hot dummies : {len(CITY_FEATURES)}")
-log(f"Total features       : {len(ALL_FEATURES)}")
-
 df = df.dropna(subset=LAG_FEATURES).reset_index(drop=True)
-log(f"Rows after dropping lag-NaN : {len(df)}")
 
 log("\n" + "-" * 70)
 log("3. CHRONOLOGICAL SPLIT")
@@ -115,196 +113,166 @@ y_train = train_df[TARGET].values
 X_test  = test_df[ALL_FEATURES].values
 y_test  = test_df[TARGET].values
 
-log(f"Train period : {train_df['datetime'].min()} -> {train_df['datetime'].max()}  ({len(train_df)} rows)")
-log(f"Test  period : {test_df['datetime'].min()}  -> {test_df['datetime'].max()}   ({len(test_df)} rows)")
-
 log("\n" + "-" * 70)
-log("4. REFERENCE BASELINES (on chronological test set)")
+log("4. REFERENCE BASELINES")
 log("-" * 70)
 
 gm_pred  = np.full(len(y_test), y_train.mean())
 gm_mae   = mean_absolute_error(y_test, gm_pred)
-gm_rmse  = np.sqrt(mean_squared_error(y_test, gm_pred))
-gm_r2    = r2_score(y_test, gm_pred)
-
-city_means = train_df.groupby("city")[TARGET].mean()
-pc_pred = test_df["city"].map(city_means).values
-pc_mae  = mean_absolute_error(y_test, pc_pred)
-pc_rmse = np.sqrt(mean_squared_error(y_test, pc_pred))
-pc_r2   = r2_score(y_test, pc_pred)
-
+pc_pred  = test_df["city"].map(train_df.groupby("city")[TARGET].mean()).values
+pc_mae   = mean_absolute_error(y_test, pc_pred)
 persist_pred = test_df["temp_lag_1h"].values
 persist_mae  = mean_absolute_error(y_test, persist_pred)
-persist_rmse = np.sqrt(mean_squared_error(y_test, persist_pred))
-persist_r2   = r2_score(y_test, persist_pred)
 
-log(f"Global mean      : MAE={gm_mae:.3f}  RMSE={gm_rmse:.3f}  R^2={gm_r2:.4f}")
-log(f"Per-city mean    : MAE={pc_mae:.3f}  RMSE={pc_rmse:.3f}  R^2={pc_r2:.4f}")
-log(f"1-h persistence  : MAE={persist_mae:.3f}  RMSE={persist_rmse:.3f}  R^2={persist_r2:.4f}")
+log(f"Global mean      : MAE={gm_mae:.3f}")
+log(f"Per-city mean    : MAE={pc_mae:.3f}")
+log(f"1-h persistence  : MAE={persist_mae:.3f}")
 
 log("\n" + "-" * 70)
 log("5. GRIDSEARCHCV (TimeSeriesSplit, MAE scoring)")
 log("-" * 70)
 
-param_grid = {
-    "n_estimators":     [100, 300],
-    "max_depth":        [None, 20],
-    "min_samples_leaf": [1, 5],
+model_configs = {
+    "RandomForest": {
+        "estimator": RandomForestRegressor(random_state=42, n_jobs=-1),
+        "param_grid": {"n_estimators": [100, 300], "max_depth": [None, 20], "min_samples_leaf": [1, 5]}
+    },
+    "GradientBoosting": {
+        "estimator": GradientBoostingRegressor(random_state=42),
+        "param_grid": {"n_estimators": [100, 300], "max_depth": [3, 5], "learning_rate": [0.05, 0.1]}
+    },
+    "LinearRegression": {
+        "estimator": Pipeline([("scaler", StandardScaler()), ("lr", LinearRegression())]),
+        "param_grid": {"lr__fit_intercept": [True, False]}
+    }
 }
+
 tscv = TimeSeriesSplit(n_splits=3)
+best_models = {}
+tuned_metrics = {}
 
-t0 = time.time()
-gs = GridSearchCV(
-    RandomForestRegressor(random_state=42, n_jobs=-1),
-    param_grid,
-    cv=tscv,
-    scoring="neg_mean_absolute_error",
-    n_jobs=-1,
-    verbose=0,
-)
-gs.fit(X_train, y_train)
-elapsed = time.time() - t0
+for name, config in model_configs.items():
+    log(f"\nTuning {name}...")
+    t0 = time.time()
+    gs = GridSearchCV(
+        config["estimator"], config["param_grid"], cv=tscv, scoring="neg_mean_absolute_error", n_jobs=-1
+    )
+    gs.fit(X_train, y_train)
+    elapsed = time.time() - t0
+    
+    best_model = gs.best_estimator_
+    best_models[name] = best_model
+    
+    pred_final = best_model.predict(X_test)
+    final_mae  = mean_absolute_error(y_test, pred_final)
+    final_rmse = np.sqrt(mean_squared_error(y_test, pred_final))
+    final_r2   = r2_score(y_test, pred_final)
+    
+    tuned_metrics[name] = {"MAE": final_mae, "RMSE": final_rmse, "R2": final_r2, "BestParams": gs.best_params_}
 
-best_params = gs.best_params_
-log(f"Search completed in {elapsed:.1f}s")
-log(f"Best params : {best_params}")
-log(f"Best CV MAE : {-gs.best_score_:.3f}")
-
-best_model = gs.best_estimator_
-pred_final = best_model.predict(X_test)
-
-final_mae  = mean_absolute_error(y_test, pred_final)
-final_rmse = np.sqrt(mean_squared_error(y_test, pred_final))
-final_r2   = r2_score(y_test, pred_final)
-final_r2_tr = r2_score(y_train, best_model.predict(X_train))
-
-log(f"Final test  : MAE={final_mae:.3f}  RMSE={final_rmse:.3f}  R^2={final_r2:.4f}  (train R^2={final_r2_tr:.4f}, gap={final_r2_tr-final_r2:.4f})")
-
-joblib.dump(best_model, os.path.join(MODELS_DIR, "rf_model_v2.pkl"))
+    log(f"  Best params : {gs.best_params_}")
+    log(f"  Test MAE    : {final_mae:.3f} C")
+    joblib.dump(best_model, os.path.join(MODELS_DIR, f"{name.lower()}_retrained.pkl"))
 
 log("\n" + "-" * 70)
-log("6. MULTI-HORIZON FORECASTING")
+log("6. MULTI-HORIZON FORECASTING (On Best Models)")
 log("-" * 70)
 
 HORIZONS = [1, 3, 6, 12, 24, 48]
-horizon_results = {}
-
 df_h = df.sort_values(["city", "datetime"]).reset_index(drop=True)
 g_target = df_h.groupby("city")["temperature_2m"]
-
 for h in HORIZONS:
     df_h[f"target_t+{h}"] = g_target.shift(-h)
 
 df_h_sorted = df_h.sort_values("datetime").reset_index(drop=True)
 cutoff_h = df_h_sorted["datetime"].quantile(0.80)
 
+horizon_results = {name: {} for name in best_models.keys()}
+
 for h in HORIZONS:
     target_col = f"target_t+{h}"
     df_h_h = df_h_sorted.dropna(subset=[target_col])
-
-    tr = df_h_h[df_h_h["datetime"] <  cutoff_h]
-    te = df_h_h[df_h_h["datetime"] >= cutoff_h]
-
-    if len(te) == 0:
-        log(f"  h=+{h:>2}h : skipped (no test rows after cutoff)")
-        continue
-
-    X_tr = tr[ALL_FEATURES].values
-    y_tr = tr[target_col].values
-    X_te = te[ALL_FEATURES].values
-    y_te = te[target_col].values
-
-    m = RandomForestRegressor(**best_params, random_state=42, n_jobs=-1)
-    m.fit(X_tr, y_tr)
-    p = m.predict(X_te)
-
-    h_mae  = mean_absolute_error(y_te, p)
-    h_rmse = np.sqrt(mean_squared_error(y_te, p))
-    h_r2   = r2_score(y_te, p)
-    horizon_results[h] = dict(MAE=h_mae, RMSE=h_rmse, R2=h_r2,
-                              train_size=int(len(tr)), test_size=int(len(te)))
-    log(f"  h=+{h:>2}h : MAE={h_mae:.3f}  RMSE={h_rmse:.3f}  R^2={h_r2:.4f}")
+    tr, te = df_h_h[df_h_h["datetime"] <  cutoff_h], df_h_h[df_h_h["datetime"] >= cutoff_h]
+    
+    if len(te) == 0: continue
+    
+    X_tr, y_tr = tr[ALL_FEATURES].values, tr[target_col].values
+    X_te, y_te = te[ALL_FEATURES].values, te[target_col].values
+    
+    for name, best_model in best_models.items():
+        # Clone architecture to refit cleanly on multi-horizon targets
+        from sklearn.base import clone
+        m = clone(best_model)
+        m.fit(X_tr, y_tr)
+        p = m.predict(X_te)
+        horizon_results[name][h] = mean_absolute_error(y_te, p)
 
 log("\n" + "-" * 70)
 log("7. PLOTS")
 log("-" * 70)
 
-plt.figure(figsize=(7, 7))
-plt.scatter(y_test, pred_final, alpha=0.45, s=10, color="steelblue", label="predictions")
-lo, hi = float(y_test.min()), float(y_test.max())
-plt.plot([lo, hi], [lo, hi], "k--", lw=1, label="ideal")
-plt.xlabel("Actual temperature [C]")
-plt.ylabel("Predicted temperature [C]")
-plt.title(f"Phase III - Predicted vs Actual (MAE={final_mae:.2f} C, R²={final_r2:.3f})")
+# Forecast error vs horizon plot
+plt.figure(figsize=(8, 5))
+for name in best_models.keys():
+    hs = sorted(horizon_results[name].keys())
+    maes = [horizon_results[name][h] for h in hs]
+    plt.plot(hs, maes, "o-", label=name)
+plt.xlabel("Forecast horizon [hours ahead]")
+plt.ylabel("MAE [C]")
+plt.title("Phase III - Forecast Error vs Horizon (All Models)")
 plt.legend()
+plt.grid(True, alpha=0.3)
 plt.tight_layout()
-plt.savefig(os.path.join(REPORTS_DIR, "phase3_pred_vs_true.png"), dpi=150)
+plt.savefig(os.path.join(REPORTS_DIR, "phase3_multihorizon_comparison.png"), dpi=150)
 plt.close()
 
-if horizon_results:
-    hs   = sorted(horizon_results.keys())
-    maes = [horizon_results[h]["MAE"] for h in hs]
-    plt.figure(figsize=(7, 5))
-    plt.plot(hs, maes, "o-", color="steelblue")
-    plt.xlabel("Forecast horizon [hours ahead]")
-    plt.ylabel("MAE [C]")
-    plt.title("Phase III - Forecast error vs horizon")
-    plt.grid(True, alpha=0.3)
-    plt.tight_layout()
-    plt.savefig(os.path.join(REPORTS_DIR, "phase3_multihorizon.png"), dpi=150)
-    plt.close()
+# Baselines Comparison Bar Chart
+labels = ["Global\nmean", "Per-city\nmean", "1-h\npersist"] + list(best_models.keys())
+maes   = [gm_mae, pc_mae, persist_mae] + [tuned_metrics[name]["MAE"] for name in best_models.keys()]
 
-labels = ["Global\nmean", "Per-city\nmean", "1-h\npersistence", "Phase III\nfinal RF"]
-maes   = [gm_mae, pc_mae, persist_mae, final_mae]
-plt.figure(figsize=(8, 5))
-bars = plt.bar(labels, maes, color=["lightgray", "lightgray", "lightgray", "steelblue"])
+plt.figure(figsize=(10, 5))
+bars = plt.bar(labels, maes, color=["lightgray", "lightgray", "lightgray", "steelblue", "darkorange", "forestgreen"])
 for bar, v in zip(bars, maes):
     plt.text(bar.get_x() + bar.get_width()/2, v + 0.05, f"{v:.2f}", ha="center", fontsize=10)
 plt.ylabel("MAE [C]")
-plt.title("Phase III - Final model vs reference baselines")
+plt.title("Phase III - Final Models vs Reference Baselines")
 plt.tight_layout()
-plt.savefig(os.path.join(REPORTS_DIR, "phase3_baselines.png"), dpi=150)
+plt.savefig(os.path.join(REPORTS_DIR, "phase3_baselines_comparison.png"), dpi=150)
 plt.close()
 
-imp = pd.Series(best_model.feature_importances_, index=ALL_FEATURES).sort_values(ascending=False)
-top20 = imp.head(20)
-plt.figure(figsize=(8, 8))
-top20[::-1].plot(kind="barh", color="steelblue")
-plt.title("Phase III - Top-20 feature importance (impurity)")
-plt.xlabel("Importance")
-plt.tight_layout()
-plt.savefig(os.path.join(REPORTS_DIR, "phase3_feature_importance.png"), dpi=150)
-plt.close()
+# Feature Importances for each model
+all_importances = {}
+for name, model in best_models.items():
+    if hasattr(model, "feature_importances_"):
+        importances = model.feature_importances_
+    else:
+        # Pipeline extraction
+        importances = np.abs(model.named_steps["lr"].coef_)
+        
+    imp = pd.Series(importances, index=ALL_FEATURES).sort_values(ascending=False)
+    all_importances[name] = imp.head(10).to_dict()
+    
+    plt.figure(figsize=(8, 8))
+    imp.head(20)[::-1].plot(kind="barh", color="steelblue")
+    plt.title(f"Phase III - Top-20 Feature Importance ({name})")
+    plt.xlabel("Importance / Absolute Coefficient")
+    plt.tight_layout()
+    plt.savefig(os.path.join(REPORTS_DIR, f"{name.lower()}_feature_importance.png"), dpi=150)
+    plt.close()
 
-log("Top-10 features:")
-log(imp.head(10).to_string())
-
+# Generate Aggregate JSON
 summary = {
     "phase": "III - Re-training",
     "rows_used": int(len(df)),
-    "train_size": int(len(train_df)),
-    "test_size":  int(len(test_df)),
     "features": {
-        "base":   BASE_FEATURES,
+        "base": BASE_FEATURES,
         "engineered": LAG_FEATURES,
-        "city_ohe":   CITY_FEATURES,
+        "city_ohe": CITY_FEATURES,
         "total_count": len(ALL_FEATURES),
     },
-    "target": TARGET,
-    "best_params": best_params,
-    "best_cv_mae": float(-gs.best_score_),
-    "baselines": {
-        "global_mean":     {"MAE": gm_mae,      "RMSE": gm_rmse,      "R2": gm_r2},
-        "per_city_mean":   {"MAE": pc_mae,      "RMSE": pc_rmse,      "R2": pc_r2},
-        "persistence_1h":  {"MAE": persist_mae, "RMSE": persist_rmse, "R2": persist_r2},
-    },
-    "phase3_final": {
-        "MAE": final_mae, "RMSE": final_rmse,
-        "R2_train": final_r2_tr, "R2_test": final_r2,
-        "train_test_gap": final_r2_tr - final_r2,
-    },
-    "multi_horizon": {str(k): v for k, v in horizon_results.items()},
-    "top10_feature_importance": imp.head(10).to_dict(),
+    "tuned_metrics": tuned_metrics,
+    "multi_horizon_mae": horizon_results,
+    "top10_feature_importances": all_importances
 }
 
 with open(os.path.join(REPORTS_DIR, "phase3_retraining_summary.json"), "w") as f:
@@ -315,6 +283,4 @@ with open(os.path.join(REPORTS_DIR, "phase3_retraining_log.txt"), "w", encoding=
 
 log("\n" + "=" * 70)
 log(f"Phase III re-training complete.")
-log(f"Model    -> models/rf_model_v2.pkl")
-log(f"Reports  -> {REPORTS_DIR}/")
 log("=" * 70)
