@@ -607,4 +607,3 @@ Phase III re-evaluates the Phase II model with a rigorous protocol, **re-trains 
 - **Citizens and small businesses** — a transparent open-data alternative to commercial weather apps.
 - **Researchers and students** — a clean Kosovo dataset and baseline ready to extend (multi-year, sequence models, deployment).
 
-
