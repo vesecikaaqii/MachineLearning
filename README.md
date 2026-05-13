@@ -376,14 +376,6 @@ The points cluster tightly along the ideal diagonal (dashed line) — the model 
 
  Humidity dominates the temperature prediction, followed by the seasonal (`month_*`) and diurnal (`hour_*`) cyclic features — a physically sensible ranking for a 31-day, hourly dataset that straddles a seasonal transition. `precipitation` is near-zero because rainfall rarely drives temperature on an hour-by-hour basis.
 
-### Note on the evaluation split
-
-Phase II uses a **random 80 / 20 train/test split**, which is the standard practice for supervised regression tasks. However, because the dataset is hourly and strongly autocorrelated in time, a random split lets adjacent hours of the same city end up on opposite sides of the partition (e.g. Pristina at 04:00 in train, Pristina at 05:00 in test). These neighbouring rows have nearly identical temperatures, which gives the model an easier task than it would face in production.
-
-The practical consequence is a **mild temporal leakage**: the Phase II metrics (MAE ≈ 1.04 °C, R² ≈ 0.91) should be read as the **upper bound** of the model's true generalisation capability, not as the honest forecasting error.
-
-This is an expected limitation of the Phase II baseline, not a defect — a diagnostic regression does not need a forecasting-grade split. Phase III re-evaluates the same model on a **chronological hold-out** (train on the first ~25 days, test on the last ~6 days — see §A.2 of the Phase III plan) to measure the true forecasting skill. The gap between the random-split metrics and the chronological-split metrics quantifies the leakage.
-
 ## Phase II Conclusions
 
 1. **A single supervised algorithm — Random Forest Regressor — was successfully trained**.
@@ -466,15 +458,6 @@ Phase III re-evaluates the Phase II model with a rigorous protocol, **re-trains 
 - The +1 h true forecast achieves **MAE 0.83 °C**, beating the strong 1-h persistence baseline (0.93 °C).
 - Best hyperparameters: `n_estimators=300, max_depth=None, min_samples_leaf=1` (chosen by GridSearchCV with TimeSeriesSplit).
 
-## Our original contribution
-
-- 27-municipality hourly dataset for Kosovo from a free, key-less source (Open-Meteo Archive).
-- Chronological forecasting protocol that removes the temporal leakage of the random split.
-- Per-city residual atlas — identifies which municipalities a single global model under-serves.
-- Baseline stack (global mean, per-city mean, persistence) that quantifies how much value Random Forest really adds over trivial predictors.
-- Feature engineering grounded in atmospheric physics (autocorrelation, pressure tendency, humidity–cloud coupling).
-- Fully reproducible artefacts — JSON summaries, training logs, and versioned plots in `reports/`; trained model in `models/`.
-
 ## Comparison with previous phases
 
 - Phase I produced a clean 20,736-row × 14-column dataset with 0 NaN and 0 duplicates.
@@ -482,38 +465,3 @@ Phase III re-evaluates the Phase II model with a rigorous protocol, **re-trains 
 - Phase III used the same data, switched to a chronological hold-out for honest measurement, added 14 engineered features (lag, rolling, delta, interactions) and 27 city dummies (one-hot encoding), and tuned hyperparameters via GridSearchCV with TimeSeriesSplit.
 - **Result:** MAE dropped from 1.04 °C (Phase II) to **0.50 °C** (Phase III) — a **52 % improvement** with the same single algorithm.
 - Train-test gap shrank from 0.079 → 0.024 (less overfitting), and R² rose from 0.91 → 0.97.
-
-## Discussion of results
-
-- **Lag features dominate.** `temp_lag_1h` alone takes ~94 % of the impurity-based importance — short-term temperature is overwhelmingly driven by recent values, exactly as atmospheric autocorrelation predicts.
-- **Random Forest beats every trivial baseline.** Global mean (MAE 4.14) and per-city mean (4.08) are useless; 1-h persistence (0.93) is surprisingly strong but still beaten by the tuned Random Forest (0.50 within-window, 0.83 at true +1 h forecasting).
-- **Phase II metrics were optimistic.** The random 80/20 split inflated R² by mixing adjacent hours; the chronological split exposed real generalisation behaviour. Phase III's improvements (features + tuning) more than compensated for the harder evaluation.
-- **Forecast accuracy degrades predictably with horizon.** MAE roughly doubles every 6 hours: +1h → 0.83, +6h → 1.89, +24h → 3.20. Beyond ~12–24 h the dataset is too short to learn reliable seasonal patterns.
-- **GridSearchCV chose deep trees.** Best params: `n_estimators=300, max_depth=None, min_samples_leaf=1` — the model needs unlimited depth to memorise lag-driven patterns, and the small train-test gap (0.024) shows this is not overfitting in this case.
-- **City encoding matters less than expected.** With per-city lag features already in place, the 27 one-hot dummies contribute marginally — much of the per-city variation was already captured by lagged values.
-
-## Conclusions
-
-- The Phase III pipeline produced an honest, leakage-free evaluation of the Random Forest forecaster.
-- **Achieved MAE 0.50 °C** on the chronological hold-out — a **52 % improvement** over the Phase II baseline (1.04 °C) using the same single algorithm.
-- True multi-hour forecasting works: **+1 h MAE 0.83 °C, +3 h 1.34 °C, +6 h 1.89 °C** — comparable to commercial short-term forecasts.
-- Train-test gap fell from 0.079 → 0.024, showing the tuned configuration generalises better, not worse.
-- The model is physically interpretable: `temp_lag_1h` dominates (atmospheric autocorrelation), followed by the diurnal cycle (`hour_cos / hour_sin`) — exactly as physics would predict.
-- The 31-day dataset is sufficient for short-horizon forecasting (≤ 12 h is reliable, ≤ 24 h is usable) but **not for monthly or seasonal prediction** — that boundary is part of the contribution, not a defect.
-
-## What we achieved and how to read it
-
-- A Kosovo-specific hourly temperature forecaster with **MAE 0.50 °C** (in-window, chronological) and **MAE 0.83 °C** at +1 h true forecasting — beats every trivial baseline by a wide margin.
-- A reusable evaluation framework (chronological split + per-city residual atlas + multi-horizon metrics) that any future team can re-run with new data — see [`reports/phase3_evaluation/`](reports/phase3_evaluation/).
-- Documented limits: forecasts are **reliable up to ~12 h**, **usable up to ~24 h**, and **unreliable beyond ~48 h** — the boundary is set by the 31-day training window, not by the algorithm.
-- All artefacts are reproducible: rerun [`weather_data_scraper.py`](weather_data_scraper.py) → [`phase2_model_training.py`](phase2_model_training.py) → [`phase3_evaluation.py`](phase3_evaluation.py) → [`phase3_retraining.py`](phase3_retraining.py) and the same numbers come out.
-
-## Who benefits and how
-
-- **Farmers and agricultural advisors** — frost-risk alerts at night, irrigation planning during heatwaves.
-- **Energy operators (KEK / KEDS)** — short-term load-balancing using hourly per-city forecasts.
-- **Public-health services** — heatwave and cold-wave advisories at municipal resolution.
-- **Municipal civil protection** — snow-risk planning for high-altitude municipalities.
-- **Citizens and small businesses** — a transparent open-data alternative to commercial weather apps.
-- **Researchers and students** — a clean Kosovo dataset and baseline ready to extend (multi-year, sequence models, deployment).
-
