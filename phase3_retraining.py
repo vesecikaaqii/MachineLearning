@@ -211,7 +211,6 @@ log("\n" + "-" * 70)
 log("7. PLOTS")
 log("-" * 70)
 
-# Forecast error vs horizon plot
 plt.figure(figsize=(8, 5))
 for name in best_models.keys():
     hs = sorted(horizon_results[name].keys())
@@ -226,7 +225,6 @@ plt.tight_layout()
 plt.savefig(os.path.join(REPORTS_DIR, "phase3_multihorizon_comparison.png"), dpi=150)
 plt.close()
 
-# Baselines Comparison Bar Chart
 labels = ["Global\nmean", "Per-city\nmean", "1-h\npersist"] + list(best_models.keys())
 maes   = [gm_mae, pc_mae, persist_mae] + [tuned_metrics[name]["MAE"] for name in best_models.keys()]
 
@@ -240,13 +238,11 @@ plt.tight_layout()
 plt.savefig(os.path.join(REPORTS_DIR, "phase3_baselines_comparison.png"), dpi=150)
 plt.close()
 
-# Feature Importances for each model
 all_importances = {}
 for name, model in best_models.items():
     if hasattr(model, "feature_importances_"):
         importances = model.feature_importances_
     else:
-        # Pipeline extraction
         importances = np.abs(model.named_steps["lr"].coef_)
         
     imp = pd.Series(importances, index=ALL_FEATURES).sort_values(ascending=False)
@@ -260,7 +256,6 @@ for name, model in best_models.items():
     plt.savefig(os.path.join(REPORTS_DIR, f"{name.lower()}_feature_importance.png"), dpi=150)
     plt.close()
 
-# Generate Aggregate JSON
 summary = {
     "phase": "III - Re-training",
     "rows_used": int(len(df)),

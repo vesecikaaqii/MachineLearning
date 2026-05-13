@@ -8,7 +8,6 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import seaborn as sns
 import joblib
-
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
@@ -85,9 +84,6 @@ X_test_scaled = scaler.transform(X_test)
 joblib.dump(scaler, os.path.join(MODELS_DIR, "scaler_phase2.pkl"))
 
 log(f"\nTrain / Test split  : {len(X_train)} / {len(X_test)}  (80% / 20%)")
-
-
-# Define multiple models (Ridge Regression removed)
 models = {
     "RandomForest": RandomForestRegressor(n_estimators=100, max_depth=None, min_samples_leaf=1, random_state=42, n_jobs=-1),
     "GradientBoosting": GradientBoostingRegressor(n_estimators=100, learning_rate=0.1, max_depth=5, random_state=42),
@@ -104,7 +100,6 @@ all_importances = {}
 for name, model in models.items():
     log(f"\n--> Training {name}...")
     
-    # Fit model on SCALED data
     model.fit(X_train_scaled, y_train)
 
     y_pred_train = model.predict(X_train_scaled)
@@ -123,17 +118,14 @@ for name, model in models.items():
 
     joblib.dump(model, os.path.join(MODELS_DIR, f"{name.lower()}_model.pkl"))
 
-    # Extract feature importances (Tree-based vs Linear models)
     if hasattr(model, "feature_importances_"):
         importances = model.feature_importances_
     else:
-        # For LinearRegression, we use the absolute values of the coefficients
         importances = np.abs(model.coef_)
 
     imp = pd.Series(importances, index=FEATURES).sort_values()
     all_importances[name] = imp.sort_values(ascending=False).to_dict()
     
-    # Plot feature importances
     plt.figure(figsize=(7, 5))
     imp.plot(kind="barh", color="steelblue")
     plt.title(f"Phase II - {name} feature importance")
@@ -141,7 +133,6 @@ for name, model in models.items():
     plt.savefig(os.path.join(REPORTS_DIR, f"phase2_{name.lower()}_feature_importance.png"), dpi=150)
     plt.close()
 
-    # Plot Pred vs Actual
     plt.figure(figsize=(6, 6))
     plt.scatter(y_test, y_pred_test, alpha=0.55, s=18, color="steelblue", label="predictions")
     lo, hi = y_test.min(), y_test.max()
@@ -154,12 +145,10 @@ for name, model in models.items():
     plt.savefig(os.path.join(REPORTS_DIR, f"phase2_{name.lower()}_pred_vs_true.png"), dpi=150)
     plt.close()
 
-    # Save metrics to aggregate summary
     all_metrics[name] = {
         "MAE": mae, "RMSE": rmse, "R2_train": r2_tr, "R2_test": r2_te
     }
 
-# Build summary JSON
 summary = {
     "phase": "II - Model Training",
     "algorithms": list(models.keys()),

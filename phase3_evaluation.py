@@ -9,7 +9,6 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import joblib
 from scipy import stats
-
 from sklearn.model_selection import KFold, learning_curve
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
 from sklearn.linear_model import LinearRegression
@@ -60,7 +59,6 @@ log(f"Rows after cleaning : {len(df)}")
 log(f"Features ({len(FEATURES)})       : {FEATURES}")
 log(f"Target              : {TARGET} (deg C)")
 
-# Define the models
 models = {
     "RandomForest": RandomForestRegressor(n_estimators=100, max_depth=None, min_samples_leaf=1, random_state=42, n_jobs=-1),
     "GradientBoosting": GradientBoostingRegressor(n_estimators=100, learning_rate=0.1, max_depth=5, random_state=42),
@@ -182,7 +180,6 @@ for name, model_instance in models.items():
     log("\n5. LEARNING CURVE")
     train_sizes = np.linspace(0.1, 1.0, 6)
     
-    # n_jobs inside learning_curve helps speed this up safely
     lc_sizes, lc_train, lc_val = learning_curve(
         clone(model_instance), X, y,
         train_sizes=train_sizes, cv=3, scoring="neg_mean_absolute_error", n_jobs=-1, random_state=42
@@ -226,7 +223,6 @@ for name, model_instance in models.items():
     
     overall_summary["results"][name] = model_summary
 
-# Save final artifacts
 with open(os.path.join(REPORTS_DIR, "phase3_evaluation_summary.json"), "w") as f:
     json.dump(overall_summary, f, indent=2, default=str)
 
