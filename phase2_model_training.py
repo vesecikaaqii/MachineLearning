@@ -11,7 +11,8 @@ import joblib
 
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
-from sklearn.ensemble import RandomForestRegressor
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 warnings.filterwarnings("ignore")
@@ -31,7 +32,7 @@ def log(msg=""):
     log_lines.append(str(msg))
 
 log("=" * 70)
-log("PHASE II  -  Model Training  (Random Forest Regressor)")
+log("PHASE II  -  Model Training  (Multiple Algorithms)")
 log("=" * 70)
 
 df = pd.read_csv(DATA_PATH)
@@ -77,76 +78,100 @@ X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.20, random_state=42
 )
 
+# Transforming the data so distance/linear models work properly
 scaler = StandardScaler().fit(X_train)
+X_train_scaled = scaler.transform(X_train)
+X_test_scaled = scaler.transform(X_test)
 joblib.dump(scaler, os.path.join(MODELS_DIR, "scaler_phase2.pkl"))
 
 log(f"\nTrain / Test split  : {len(X_train)} / {len(X_test)}  (80% / 20%)")
 
 
-cfg = dict(n_estimators=100, max_depth=None, min_samples_leaf=1,
-           random_state=42, n_jobs=-1)
+# Define multiple models (Ridge Regression removed)
+models = {
+    "RandomForest": RandomForestRegressor(n_estimators=100, max_depth=None, min_samples_leaf=1, random_state=42, n_jobs=-1),
+    "GradientBoosting": GradientBoostingRegressor(n_estimators=100, learning_rate=0.1, max_depth=5, random_state=42),
+    "LinearRegression": LinearRegression()
+}
 
 log("\n" + "-" * 70)
-log("TRAINING")
+log("TRAINING MULTIPLE MODELS")
 log("-" * 70)
-log(f"Config : {cfg}")
 
-model = RandomForestRegressor(**cfg)
-model.fit(X_train, y_train)
+all_metrics = {}
+all_importances = {}
 
-y_pred_train = model.predict(X_train)
-y_pred_test  = model.predict(X_test)
+for name, model in models.items():
+    log(f"\n--> Training {name}...")
+    
+    # Fit model on SCALED data
+    model.fit(X_train_scaled, y_train)
 
-mae   = mean_absolute_error(y_test,  y_pred_test)
-rmse  = np.sqrt(mean_squared_error(y_test, y_pred_test))
-r2_te = r2_score(y_test,  y_pred_test)
-r2_tr = r2_score(y_train, y_pred_train)
+    y_pred_train = model.predict(X_train_scaled)
+    y_pred_test  = model.predict(X_test_scaled)
 
-log("\nTraining results:")
-log(f"  MAE         : {mae:.3f} C")
-log(f"  RMSE        : {rmse:.3f} C")
-log(f"  R^2 (train) : {r2_tr:.4f}")
-log(f"  R^2 (test)  : {r2_te:.4f}")
+    mae   = mean_absolute_error(y_test,  y_pred_test)
+    rmse  = np.sqrt(mean_squared_error(y_test, y_pred_test))
+    r2_te = r2_score(y_test,  y_pred_test)
+    r2_tr = r2_score(y_train, y_pred_train)
 
-joblib.dump(model, os.path.join(MODELS_DIR, "rf_model.pkl"))
+    log("Training results:")
+    log(f"  MAE         : {mae:.3f} C")
+    log(f"  RMSE        : {rmse:.3f} C")
+    log(f"  R^2 (train) : {r2_tr:.4f}")
+    log(f"  R^2 (test)  : {r2_te:.4f}")
 
-imp = pd.Series(model.feature_importances_, index=FEATURES).sort_values()
-plt.figure(figsize=(7, 5))
-imp.plot(kind="barh", color="steelblue")
-plt.title("Phase II - Random Forest feature importance")
-plt.tight_layout()
-plt.savefig(os.path.join(REPORTS_DIR, "phase2_feature_importance.png"), dpi=150)
-plt.close()
+    joblib.dump(model, os.path.join(MODELS_DIR, f"{name.lower()}_model.pkl"))
 
-log("\nFeature importance:")
-log(imp.sort_values(ascending=False).to_string())
+    # Extract feature importances (Tree-based vs Linear models)
+    if hasattr(model, "feature_importances_"):
+        importances = model.feature_importances_
+    else:
+        # For LinearRegression, we use the absolute values of the coefficients
+        importances = np.abs(model.coef_)
 
-plt.figure(figsize=(6, 6))
-plt.scatter(y_test, y_pred_test, alpha=0.55, s=18, color="steelblue",
-            label="predictions")
-lo, hi = y_test.min(), y_test.max()
-plt.plot([lo, hi], [lo, hi], "k--", lw=1, label="ideal")
-plt.xlabel("Actual temperature (C)")
-plt.ylabel("Predicted temperature (C)")
-plt.title("Phase II - Predicted vs Actual temperature")
-plt.legend()
-plt.tight_layout()
-plt.savefig(os.path.join(REPORTS_DIR, "phase2_pred_vs_true.png"), dpi=150)
-plt.close()
+    imp = pd.Series(importances, index=FEATURES).sort_values()
+    all_importances[name] = imp.sort_values(ascending=False).to_dict()
+    
+    # Plot feature importances
+    plt.figure(figsize=(7, 5))
+    imp.plot(kind="barh", color="steelblue")
+    plt.title(f"Phase II - {name} feature importance")
+    plt.tight_layout()
+    plt.savefig(os.path.join(REPORTS_DIR, f"phase2_{name.lower()}_feature_importance.png"), dpi=150)
+    plt.close()
 
+    # Plot Pred vs Actual
+    plt.figure(figsize=(6, 6))
+    plt.scatter(y_test, y_pred_test, alpha=0.55, s=18, color="steelblue", label="predictions")
+    lo, hi = y_test.min(), y_test.max()
+    plt.plot([lo, hi], [lo, hi], "k--", lw=1, label="ideal")
+    plt.xlabel("Actual temperature (C)")
+    plt.ylabel("Predicted temperature (C)")
+    plt.title(f"Phase II - {name} Predicted vs Actual")
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(os.path.join(REPORTS_DIR, f"phase2_{name.lower()}_pred_vs_true.png"), dpi=150)
+    plt.close()
+
+    # Save metrics to aggregate summary
+    all_metrics[name] = {
+        "MAE": mae, "RMSE": rmse, "R2_train": r2_tr, "R2_test": r2_te
+    }
+
+# Build summary JSON
 summary = {
     "phase": "II - Model Training",
-    "algorithm": "RandomForestRegressor",
+    "algorithms": list(models.keys()),
     "rows_used": int(len(df)),
     "train_size": int(len(X_train)),
     "test_size":  int(len(X_test)),
     "features":   FEATURES,
     "target":     TARGET,
-    "config":     cfg,
-    "metrics":    {"MAE": mae, "RMSE": rmse,
-                   "R2_train": r2_tr, "R2_test": r2_te},
-    "feature_importance": imp.sort_values(ascending=False).to_dict(),
+    "metrics":    all_metrics,
+    "feature_importances": all_importances,
 }
+
 with open(os.path.join(REPORTS_DIR, "phase2_training_summary.json"), "w") as f:
     json.dump(summary, f, indent=2)
 
