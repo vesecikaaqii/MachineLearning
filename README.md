@@ -541,7 +541,7 @@ Compared to typical course projects that train a single algorithm on a single ra
 5. **A documented inversion of algorithm ranking** — showing that *which* model wins depends on *which* features it sees. This is a result that, to our knowledge, is not highlighted in any of the standard scikit-learn weather-forecasting tutorials.
 6. **Per-algorithm multi-horizon forecasting** (1, 3, 6, 12, 24, 48 hours ahead) plotted on a shared chart, so the user can see which algorithm to pick for which forecast horizon — Gradient Boosting for very short range, Linear Regression for medium / long range.
 
-## How to read these results — who benefits, and how
+## who benefits, and how
 
 | Reader | What this project gives them | How they use it |
 |--------|------------------------------|-----------------|
