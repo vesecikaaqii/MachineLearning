@@ -106,14 +106,6 @@ python phase3_retraining.py
 
 ---
 
-## About the Project
-
-### The problem
-Accurate short-term temperature forecasts are essential for agriculture planning, energy demand prediction, public-health advisories, and daily citizen decisions. Commercial weather services provide generic forecasts, but **small, region-specific models tuned on local data** often capture micro-climatic behaviour more faithfully than global models.
-
-### The idea
-Build a **supervised Machine-Learning pipeline** that ingests real meteorological data from the [Open-Meteo Archive API](https://open-meteo.com/en/docs/historical-weather-api) for all 27 municipalities of Kosovo and learns to **predict the air temperature** (°C) from other observable variables — humidity, pressure, wind speed, cloud coverage, precipitation, and the time of day.
-
 ### The approach
 | Step | Action |
 |------|--------|
@@ -129,16 +121,6 @@ Build a **supervised Machine-Learning pipeline** that ingests real meteorologica
 ## Objective of the Phase
 Phase I lays the foundation of the whole project: **collecting, structuring, and performing the initial preparation of a real meteorological dataset for Kosovo**, and defining the ML task the model will later solve. Preparing the model means preparing *everything the model will need* — clean data, well-understood features, a clearly stated target, and a justified algorithm family — before any training takes place.
 
-## Tasks Performed
-
-1. **Identification of the data source** — the [Open-Meteo Archive API](https://open-meteo.com/en/docs/historical-weather-api) was chosen as a trusted, free, key-less source for global historical hourly meteorological data.
-2. **Selection of 27 municipalities of Kosovo** with their (lat, lon) coordinates to cover all regions.
-3. **Development of the script [`weather_data_scraper.py`](weather_data_scraper.py)** which, for each city:
-   - queries the `archive-api.open-meteo.com/v1/archive` endpoint for the last ~31 days,
-   - requests hourly `temperature_2m`, `relative_humidity_2m`, `apparent_temperature`, `precipitation`, `surface_pressure`, `cloud_cover`, `wind_speed_10m`, `wind_direction_10m` (timezone `Europe/Belgrade`).
-4. **Persistence to CSV** as [`kosovo_weather_dataset.csv`](kosovo_weather_dataset.csv), automatically appending the columns `hour`, `day`, `month`, and `year` for temporal analysis.
-5. **Preprocessing inside the scraper** — deterministic sort by `(city, datetime)`, `drop_duplicates` on the `(city, datetime)` primary key, and a logged NaN count (see §Preprocessing Performed in Phase I below for the full list).
-6. **Integrity verification** — the dataset ships with **zero duplicates and zero NaN** across all 14 columns.
 
 ## Defined Machine-Learning Tasks
 
@@ -179,30 +161,6 @@ Out of 14 total columns, the structural split is:
 |--------|---------|-----------|
 | all 14 columns | **0** | none required |
 
-**Total NaN in the dataset: 0 / (20,736 × 14 = 290,304 cells) → 0.00 %** — the Open-Meteo archive returns fully-populated hourly records.
-
-## Preprocessing Performed in Phase I
-
-The following preprocessing steps run automatically inside [`weather_data_scraper.py`](weather_data_scraper.py) after the API responses are concatenated, producing a model-ready CSV:
-
-1. **Datetime parsing** — the raw `time` column is renamed to `datetime` and converted to `pandas` datetime.
-2. **Temporal feature derivation** — `hour`, `day`, `month`, and `year` are extracted from `datetime` for later cyclic encoding in Phase II.
-3. **Deterministic ordering** — rows are sorted by `(city, datetime)` so every downstream step (including the Phase III chronological split) is reproducible.
-4. **Deduplication** — `drop_duplicates(subset=["city", "datetime"])` guarantees a unique hour-per-city primary key; the scraper logs how many duplicates were removed (currently 0).
-5. **Null verification** — total NaN count is logged; the scraper emits a warning if any cell is null, so the downstream pipeline can trigger its defensive imputation.
-
-Further transformations — cyclic encoding of `hour`/`month` via `sin/cos`, and `StandardScaler` fit on the training partition — are deferred to Phase II, where they belong logically next to the model fit.
-
-## Why these attributes?
-
-- **Core meteorological variables** (`temperature_2m`, `relative_humidity_2m`, `surface_pressure`, `wind_speed_10m`, `wind_direction_10m`, `cloud_cover`) — standard physical inputs for atmospheric modelling.
-- **`apparent_temperature`** — "feels-like" temperature, useful as a sanity reference and for later multi-target experiments.
-- **`precipitation`** (mm in the last hour) — ground-truth rainfall from the Open-Meteo archive, used directly in the model pipeline.
-- **`hour`, `day`, `month`, `year`** — automatically derived to capture **temporal cycles** (diurnal / seasonal); `hour` and `month` are later encoded cyclically with `sin / cos`.
-- **`city`** — enables per-city modelling or regional climate grouping.
-- **lat / lon coordinates** are not stored in the CSV because they are static per city and can be re-joined from `weather_data_scraper.py`.
-
-## Dataset Overview and Exploratory Insights
 
 ### Dataset at a Glance
 
@@ -307,7 +265,6 @@ Further transformations — cyclic encoding of `hour`/`month` via `sin/cos`, and
 
 ## Objective of the Phase
 
-Phase II is strictly the **training** step of the ML workflow: a single supervised algorithm (**Random Forest Regressor**) is trained on the prepared dataset from Phase I. Evaluation in depth, re-training, and hyperparameter iteration are **deferred to Phase III** — this phase focuses on producing a correctly trained model together with the preprocessing pipeline around it.
 
 - **Training script:** [`phase2_model_training.py`](phase2_model_training.py)
 - **Training log:** [`reports/phase2_training_log.txt`](reports/phase2_training_log.txt)
