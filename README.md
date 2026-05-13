@@ -27,18 +27,6 @@ A Machine Learning project that builds a complete, reproducible pipeline — fro
 
 ---
 
-## Table of Contents
-
-1. [Technologies Used](#technologies-used)
-2. [Installation and Setup](#installation-and-setup)
-3. [Dataset Description](#dataset-description)
-4. [About the Project](#about-the-project)
-5. [PHASE I — Model Preparation](#phase-i--model-preparation)
-6. [Dataset Overview and Exploratory Insights](#dataset-overview-and-exploratory-insights)
-7. [Selected Algorithm](#selected-algorithm)
-8. [PHASE II — Model Training](#phase-ii--model-training)
-9. [PHASE III — Analysis and Evaluation](#phase-iii--analysis-and-evaluation)
-
 ### Project Phases (per course structure)
 
 | Phase | Title | Status |
@@ -96,41 +84,6 @@ python phase3_evaluation.py
 python phase3_retraining.py
 ```
 
-### Expected artifacts after running all phases
-
-```
-models/
-├── rf_model.pkl             
-├── rf_model_v2.pkl           
-└── scaler_phase2.pkl
-
-reports/
-├── phase2_training_summary.json
-├── phase2_training_log.txt
-├── phase2_correlation_heatmap.png
-├── phase2_feature_importance.png
-├── phase2_pred_vs_true.png
-├── phase3_evaluation/
-│   ├── phase3_evaluation_summary.json
-│   ├── phase3_evaluation_log.txt
-│   ├── residuals.png
-│   ├── qq_plot.png
-│   ├── residuals_vs_pred.png
-│   ├── error_by_hour.{csv,png}
-│   ├── error_by_city.{csv,png}
-│   ├── error_by_quartile.csv
-│   ├── learning_curve.png
-│   └── permutation_importance.{csv,png}
-└── phase3_retraining/
-    ├── phase3_retraining_summary.json
-    ├── phase3_retraining_log.txt
-    ├── phase3_pred_vs_true.png
-    ├── phase3_multihorizon.png
-    ├── phase3_baselines.png
-    └── phase3_feature_importance.png
-```
-
----
 
 ## Dataset Description
 
